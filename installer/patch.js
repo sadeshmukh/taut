@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import { existsSync, constants, readdirSync } from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { createPackage, extractFile } from '@electron/asar'
 import { fileURLToPath } from 'node:url'
 import {
@@ -17,26 +17,18 @@ import { configDir } from 'helpers'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 /**
- * Retrieves the version of the Taut installer from package.json.
- * @returns {Promise<string>} The installer version, or 'unknown' if not found.
+ * Current patch version. Increment this when the shim/loader logic changes
+ * in a way that requires re-patching the Slack binary.
+ * @type {number}
  */
-export async function getInstallerVersion() {
-  try {
-    const pkgPath = path.join(__dirname, 'package.json')
-    const pkgContent = await fs.readFile(pkgPath, 'utf8')
-    const pkg = JSON.parse(pkgContent)
-    return pkg.version
-  } catch {
-    return 'unknown'
-  }
-}
+export const PATCH_VERSION = 0
 
 /**
  * Extracts version information from an asar archive's package.json.
  * @param {string} asarPath - The path to the asar file.
- * @returns {Promise<{name: string, version: string} | null>} The name and version, or null if not found.
+ * @returns {Promise<{name: string, version: string, patchVersion?: number} | null>} The name, version, and optional patchVersion, or null if not found.
  */
-export async function getAsarVersion(asarPath) {
+export async function getAsarInfo(asarPath) {
   if (!existsSync(asarPath)) return null
 
   try {
@@ -46,6 +38,8 @@ export async function getAsarVersion(asarPath) {
     return {
       name: pkg.name || 'unknown',
       version: pkg.version || 'unknown',
+      patchVersion:
+        typeof pkg.patchVersion === 'number' ? pkg.patchVersion : undefined,
     }
   } catch {
     // Ignore errors
@@ -86,8 +80,6 @@ export async function getBinaryFuses(binaryPath) {
     return null
   }
 }
-
-// TODO: verify that it works on Windows and Linux
 
 /**
  * Gets possible Slack installation paths on Windows.
@@ -182,15 +174,23 @@ async function checkWriteAccess(dir) {
 export function isSlackRunning() {
   try {
     if (process.platform === 'win32') {
-      const result = execFileSync('tasklist', ['/FI', 'IMAGENAME eq slack.exe'], {
-        encoding: 'utf8',
-      })
+      const result = execFileSync(
+        'tasklist',
+        ['/FI', 'IMAGENAME eq slack.exe'],
+        {
+          encoding: 'utf8',
+        }
+      )
       return result.toLowerCase().includes('slack.exe')
     } else if (process.platform === 'darwin') {
-      const result = execFileSync('pgrep', ['-x', 'Slack'], { encoding: 'utf8' })
+      const result = execFileSync('pgrep', ['-x', 'Slack'], {
+        encoding: 'utf8',
+      })
       return result.trim().length > 0
     } else {
-      const result = execFileSync('pgrep', ['-x', 'slack'], { encoding: 'utf8' })
+      const result = execFileSync('pgrep', ['-x', 'slack'], {
+        encoding: 'utf8',
+      })
       return result.trim().length > 0
     }
   } catch {
@@ -240,25 +240,6 @@ export async function isBroken(resourcesDir) {
   const backup = path.join(resourcesDir, '_app.asar')
   // Broken: backup exists but original doesn't
   return existsSync(backup) && !existsSync(appAsar)
-}
-
-/**
- * Recovers a broken Slack installation by restoring backup files.
- * @param {string} resourcesDir - The Slack resources directory path.
- * @returns {Promise<void>}
- */
-export async function recoverBroken(resourcesDir) {
-  console.log('🔧 Detected broken install state. Attempting recovery...')
-  const appAsar = path.join(resourcesDir, 'app.asar')
-  const backup = path.join(resourcesDir, '_app.asar')
-  const unpacked = path.join(resourcesDir, 'app.asar.unpacked')
-  const unpackedBackup = path.join(resourcesDir, '_app.asar.unpacked')
-
-  await fs.rename(backup, appAsar)
-  if (existsSync(unpackedBackup)) {
-    await fs.rename(unpackedBackup, unpacked)
-  }
-  console.log('✅ Recovery complete.')
 }
 
 /**
@@ -342,6 +323,7 @@ export async function disableIntegrityCheck(resourcesDir) {
   await flipFuses(executablePath, {
     version: FuseVersion.V1,
     [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: false,
+    // [FuseV1Options.EnableCookieEncryption]: false,
     // resetAdHocDarwinSignature: true, // we'll do it later
   })
   console.log('✅ Integrity check disabled.')
@@ -361,18 +343,16 @@ export async function buildShim(resourcesDir) {
     const loaderSrc = path.join(__dirname, 'loader.js')
     const loaderContent = await fs.readFile(loaderSrc, 'utf8')
 
-    // Get installer version
-    const installerVersion = await getInstallerVersion()
-
     // Write shim files
     await fs.writeFile(path.join(tmpDir, 'loader.js'), loaderContent)
 
     await fs.writeFile(
       path.join(tmpDir, 'package.json'),
       JSON.stringify({
-        name: 'taut-shim',
+        name: 'taut',
         main: 'index.js',
-        version: installerVersion,
+        version: `${PATCH_VERSION}.0.0`,
+        patchVersion: PATCH_VERSION,
       })
     )
 
@@ -400,35 +380,48 @@ export async function resign(resourcesDir) {
   }
   const appPath = path.resolve(resourcesDir, '..', '..')
   console.log('🔏 Resigning Slack app...')
-  try {
-    execFileSync('codesign', [
+  const cs = spawnSync(
+    'codesign',
+    [
       '--force',
       '--sign',
       '-',
       '--deep',
       '--preserve-metadata=identifier,entitlements',
       appPath,
-    ], { stdio: 'ignore' })
-  } catch (err) {
-    console.error('❌ Resign failed:', err)
-    throw err
+    ],
+    { encoding: 'utf8' }
+  )
+
+  if (cs.error || cs.status !== 0) {
+    if (cs.stderr) console.error(cs.stderr)
+    console.error(
+      `❌ codesign failed${
+        cs.error ? `: ${cs.error.message}` : ` with exit code ${cs.status}`
+      }`
+    )
   }
-  try {
-    execFileSync('xattr', ['-d', 'com.apple.quarantine', appPath], { stdio: 'ignore' })
-  } catch {
-    // Ignore if no quarantine attribute
+
+  const xa = spawnSync('xattr', ['-d', 'com.apple.quarantine', appPath], {
+    encoding: 'utf8',
+  })
+
+  if (xa.error || xa.status !== 0) {
+    const stderr = xa.stderr || ''
+    if (!stderr.includes('No such xattr: com.apple.quarantine')) {
+      if (stderr) console.error(stderr)
+      console.error('❌ xattr failed')
+    }
+    // If the message was that the attribute doesn't exist, that's normal
   }
   console.log('✅ Resign complete.')
 }
 
 export async function copyJsToConfigDir() {
   console.log('📋 Copying JS files to config directory...')
-  
+
   const sourceDir = path.join(__dirname, 'js')
-  const destDir = path.join(
-    configDir,
-    'js',
-  )
+  const destDir = path.join(configDir, 'js')
 
   try {
     await fs.rm(destDir, { recursive: true, force: true })
@@ -443,13 +436,36 @@ export async function copyJsToConfigDir() {
 }
 
 /**
- * Patches the Slack installation to load Taut.
+ * Applies the Taut patch to Slack (internal).
  * This will backup original files, build a shim, disable integrity checks,
- * and re-sign the app (on macOS).
+ * and re-sign the app (on macOS). Does NOT copy JS files.
  * @param {string} resourcesDir - The Slack resources directory path.
  * @returns {Promise<void>}
  */
-export async function patch(resourcesDir) {
+async function applyPatch(resourcesDir) {
+  if (await isPatched(resourcesDir)) {
+    console.log('ℹ️  Already patched. Removing old patch first...')
+    await removePatch(resourcesDir)
+    console.log()
+  }
+
+  await disableIntegrityCheck(resourcesDir)
+
+  await backup(resourcesDir)
+  await buildShim(resourcesDir)
+
+  await resign(resourcesDir)
+
+  console.log('✅ Patch applied successfully!')
+}
+
+/**
+ * Checks common preconditions for install/uninstall operations.
+ * Kills Slack if running, checks write access, and checks for broken installs.
+ * @param {string} resourcesDir - The Slack resources directory path.
+ * @returns {Promise<void>}
+ */
+async function checkPreconditions(resourcesDir) {
   if (isSlackRunning()) {
     const killed = await killSlack()
     // Double-check
@@ -473,57 +489,60 @@ export async function patch(resourcesDir) {
   }
 
   if (await isBroken(resourcesDir)) {
-    // await recoverBroken(resourcesDir)
     console.error(
       '❌ Detected broken Slack installation. Please reinstall Slack.'
     )
     process.exit(1)
   }
-
-  if (await isPatched(resourcesDir)) {
-    console.log('ℹ️  Already patched. Unpatching first...')
-    await unpatch(resourcesDir)
-    console.log()
-  }
-
-  await disableIntegrityCheck(resourcesDir)
-
-  await backup(resourcesDir)
-  await buildShim(resourcesDir)
-
-  await resign(resourcesDir)
-
-  await copyJsToConfigDir()
-
-  console.log('✅ Successfully patched Slack!')
 }
 
 /**
- * Removes the Taut patch from Slack, restoring original files.
+ * Installs or updates Taut on the Slack installation.
+ * If the patch is missing or outdated, it will apply the patch.
+ * Always copies the JS files to the config directory.
  * @param {string} resourcesDir - The Slack resources directory path.
  * @returns {Promise<void>}
  */
-export async function unpatch(resourcesDir) {
-  if (isSlackRunning()) {
-    const killed = await killSlack()
-    // Double-check
-    if (!killed || isSlackRunning()) {
-      console.error('❌ Could not close Slack. Please close it manually.')
-      process.exit(1)
-    }
-  }
+export async function install(resourcesDir) {
+  await checkPreconditions(resourcesDir)
 
-  if (!(await checkWriteAccess(resourcesDir))) {
-    if (process.platform === 'darwin') {
-      console.error(
-        '❌ Permission denied. Try running with sudo or grant Full Disk Access.'
+  const appAsar = path.join(resourcesDir, 'app.asar')
+  const asarInfo = await getAsarInfo(appAsar)
+
+  // Check if we need to apply/update the patch
+  const needsPatch =
+    !asarInfo ||
+    asarInfo.name !== 'taut' ||
+    asarInfo.patchVersion !== PATCH_VERSION
+
+  if (needsPatch) {
+    if (asarInfo?.name === 'taut') {
+      console.log(
+        `ℹ️  Updating patch from v${
+          asarInfo.patchVersion || '?'
+        } to v${PATCH_VERSION}...`
       )
     } else {
-      console.error('❌ Permission denied. Try running with sudo.')
+      console.log('📦 Applying Taut patch...')
     }
-    process.exit(1)
+    await applyPatch(resourcesDir)
+  } else {
+    console.log(`ℹ️  Patch v${PATCH_VERSION} is up to date.`)
   }
 
+  console.log()
+  await copyJsToConfigDir()
+
+  console.log()
+  console.log('✅ Taut installed successfully!')
+}
+
+/**
+ * Removes the Taut patch from Slack, restoring original files (internal).
+ * @param {string} resourcesDir - The Slack resources directory path.
+ * @returns {Promise<void>}
+ */
+async function removePatch(resourcesDir) {
   if (!(await isPatched(resourcesDir))) {
     console.log('ℹ️  Slack is not patched.')
     return
@@ -576,5 +595,16 @@ export async function unpatch(resourcesDir) {
     throw err
   }
 
-  console.log('✅ Successfully unpatched Slack!')
+  console.log('✅ Patch removed successfully!')
+}
+
+/**
+ * Uninstalls Taut from Slack, restoring original files.
+ * @param {string} resourcesDir - The Slack resources directory path.
+ * @returns {Promise<void>}
+ */
+export async function uninstall(resourcesDir) {
+  await checkPreconditions(resourcesDir)
+  await removePatch(resourcesDir)
+  console.log('✅ Taut uninstalled successfully!')
 }

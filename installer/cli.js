@@ -1,15 +1,14 @@
 #!/usr/bin/env node
-import { existsSync } from 'node:fs'
 import path from 'node:path'
 import {
   findSlackInstall,
   getSlackPaths,
-  isPatched,
-  patch,
-  unpatch,
+  install,
+  uninstall,
   getElectronBinary,
   getBinaryFuses,
-  getAsarVersion,
+  getAsarInfo,
+  PATCH_VERSION,
 } from 'patch'
 
 /**
@@ -46,54 +45,63 @@ async function main() {
   console.log(`📍 Found Slack at: ${resourcesDir}`)
   console.log()
 
-  const patchedStatus = (await isPatched(resourcesDir)) ? 'Yes' : 'No'
-  if (patchedStatus === 'Yes') {
-    const appAsarVersion = await getAsarVersion(
-      path.join(resourcesDir, 'app.asar')
+  // Show current patch status
+  const appAsar = path.join(resourcesDir, 'app.asar')
+  const appAsarInfo = await getAsarInfo(appAsar)
+
+  if (appAsarInfo && appAsarInfo.name === 'taut') {
+    const isUpToDate = appAsarInfo.patchVersion === PATCH_VERSION
+    const statusText = isUpToDate
+      ? 'up to date'
+      : `outdated, latest is v${PATCH_VERSION}`
+    console.log(
+      `   Installed: Taut patch v${
+        appAsarInfo.patchVersion || '?'
+      } (${statusText})`
     )
-    if (appAsarVersion) {
-      console.log(`   Patched: Yes, v${appAsarVersion.version}`)
-    } else {
-      console.log('   Patched: Yes (version unknown)')
-    }
   } else {
-    console.log(`   Patched: ${patchedStatus}`)
+    console.log('   Installed: No')
   }
   console.log()
 
-  if (!action || action === 'install' || action === 'patch') {
-    await patch(resourcesDir)
-  } else if (action === 'uninstall' || action === 'unpatch') {
-    await unpatch(resourcesDir)
+  if (!action || action === 'install') {
+    await install(resourcesDir)
+  } else if (action === 'uninstall') {
+    await uninstall(resourcesDir)
   } else if (action === 'status') {
-    // Already printed basic status above
-
     // Check asar files and their versions
-    const appAsar = path.join(resourcesDir, 'app.asar')
-    const backupAsar = path.join(resourcesDir, '_app.asar')
-
-    const appAsarVersion = await getAsarVersion(appAsar)
-    const backupAsarVersion = await getAsarVersion(backupAsar)
 
     // app.asar line
-    if (appAsarVersion && appAsarVersion.name === 'taut') {
-      console.log(`app.asar: ✅ Taut v${appAsarVersion.version}`)
-    } else if (appAsarVersion && appAsarVersion.name === 'slack-desktop') {
-      console.log(`app.asar: ✅ Slack v${appAsarVersion.version} (not patched)`)
+    if (appAsarInfo && appAsarInfo.name === 'taut') {
+      const isUpToDate = appAsarInfo.patchVersion === PATCH_VERSION
+      const statusText = isUpToDate ? 'up to date' : 'outdated'
+      console.log(
+        `app.asar: ✅ Taut patch v${
+          appAsarInfo.patchVersion || '?'
+        } (${statusText})`
+      )
+    } else if (appAsarInfo && appAsarInfo.name === 'slack-desktop') {
+      console.log(`app.asar: ✅ Slack v${appAsarInfo.version} (not patched)`)
     } else {
       console.log(`app.asar: ❌ Unknown or missing`)
     }
 
+    const backupAsar = path.join(resourcesDir, '_app.asar')
+    const backupAsarInfo = await getAsarInfo(backupAsar)
+
     // _app.asar line
-    if (backupAsarVersion && backupAsarVersion.name === 'taut') {
-      console.log(`_app.asar: ⚠️  Taut v${backupAsarVersion.version}`)
-    } else if (
-      backupAsarVersion &&
-      backupAsarVersion.name === 'slack-desktop'
-    ) {
-      console.log(`_app.asar: ✅ Slack v${backupAsarVersion.version}`)
+    if (backupAsarInfo && backupAsarInfo.name === 'taut') {
+      console.log(
+        `_app.asar: ⚠️  Taut patch v${
+          backupAsarInfo.patchVersion || '?'
+        } (broken, should be Slack!)`
+      )
+    } else if (backupAsarInfo && backupAsarInfo.name === 'slack-desktop') {
+      console.log(`_app.asar: ✅ Slack v${backupAsarInfo.version}`)
+    } else if (appAsarInfo && appAsarInfo.name === 'taut') {
+      console.log(`_app.asar: ❌ Missing (broken state!)`)
     } else {
-      console.log(`_app.asar: ❌ Unknown or missing`)
+      console.log(`_app.asar: ➖ Not present (not patched)`)
     }
 
     console.log('')
@@ -123,9 +131,9 @@ async function main() {
     console.log('Usage: npx taut-installer [command] [path]')
     console.log()
     console.log('Commands:')
-    console.log('  install, patch     Install Taut (default)')
-    console.log('  uninstall, unpatch Remove Taut')
-    console.log('  status             Show current status')
+    console.log('  install    Install or update Taut (default)')
+    console.log('  uninstall  Remove Taut')
+    console.log('  status     Show current status')
     console.log()
     console.log('Examples:')
     console.log('  npx taut-installer')

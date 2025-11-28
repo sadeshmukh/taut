@@ -1,13 +1,9 @@
 const Module = require('module')
 const electron = require('electron')
+const fs = require('fs')
 
-/**
- * The script we inject into the Slack window to signal that Taut is active.
- * @returns {void}
- */
-function injected() {
-  alert('Hello from Taut!')
-}
+/** Contents of ./browser.js */
+const injected = fs.readFileSync(require.resolve('./browser.js'), 'utf-8')
 
 /**
  * Hold the primary Slack BrowserWindow so we can inject scripts once ready.
@@ -20,44 +16,84 @@ let BROWSER
  * @type {RegExp[]}
  */
 const modules = [/^electron.*$/]
-
 /**
  * Map of function paths to their redirect handlers.
  * Keys are in the format '<module>.ClassName.<constructor>' or '<module>.ClassName.methodName'.
  * @type {Map<string, Function>}
  */
-const redirected = new Map([
-  [
-    '<electron>.BrowserWindow.<constructor>',
+const redirected = new Map()
+redirected.set(
+  '<electron>.BrowserWindow.<constructor>',
+  /**
+   * Redirect for BrowserWindow constructor to inject our script.
+   * @param {typeof electron.BrowserWindow} target - The original BrowserWindow constructor
+   * @param {[electron.BrowserWindowConstructorOptions?]} args - Constructor arguments
+   * @param {Function} newTarget - The new.target value
+   * @returns {electron.BrowserWindow} The constructed BrowserWindow instance
+   */
+  (target, args, newTarget) => {
+    if (typeof args[0] === 'object' && args[0]?.webPreferences) {
+      args[0].webPreferences.devTools = true
+      args[0].autoHideMenuBar = false
+    }
+
+    BROWSER = Reflect.construct(target, args, newTarget)
+    if (!BROWSER) {
+      throw new Error('Failed to create BrowserWindow')
+    }
+
+    // Run our injected script once the window has finished loading.
+    BROWSER.webContents.on('dom-ready', async () => {
+      await BROWSER?.webContents.executeJavaScript(injected)
+    })
+
+    return BROWSER
+  }
+)
+// secureStorage causes annoying permission prompts on macOS, and we're breaking security anyway
+if (process.platform === 'darwin') {
+  redirected.set(
+    '<electron>.secureStorage.isEncryptionAvailable',
     /**
-     * Redirect for BrowserWindow constructor to inject our script.
-     * @param {typeof electron.BrowserWindow} target - The original BrowserWindow constructor
-     * @param {[electron.BrowserWindowConstructorOptions?]} args - Constructor arguments
-     * @param {Function} newTarget - The new.target value
-     * @returns {electron.BrowserWindow} The constructed BrowserWindow instance
+     * Redirect for secureStorage.isEncryptionAvailable to always return true.
+     * @param {Function} target - The original isEncryptionAvailable function
+     * @param {any} thisArg - The this context
+     * @param {[]} argArray - Function arguments
+     * @returns {true} Always true
      */
-    (target, args, newTarget) => {
-      if (typeof args[0] === 'object' && args[0]?.webPreferences) {
-        args[0].webPreferences.devTools = true
-        args[0].autoHideMenuBar = false
-      }
-
-      BROWSER = Reflect.construct(target, args, newTarget)
-      if (!BROWSER) {
-        throw new Error('Failed to create BrowserWindow')
-      }
-
-      // Run our injected script once the window has finished loading.
-      BROWSER.webContents.on('dom-ready', async () => {
-        await BROWSER?.webContents.executeJavaScript(
-          `;(${injected.toString()})()`
-        )
-      })
-
-      return BROWSER
-    },
-  ],
-])
+    (target, thisArg, argArray) => {
+      return true
+    }
+  )
+  redirected.set(
+    '<electron>.secureStorage.encryptString',
+    /**
+     * Redirect for secureStorage.encryptString to not do any encryption.
+     * @param {Function} target - The original encryptString function
+     * @param {any} thisArg - The this context
+     * @param {[string]} argArray - Function arguments
+     * @returns {Buffer} A Buffer containing the original string bytes
+     */
+    (target, thisArg, argArray) => {
+      const str = argArray[0]
+      return Buffer.from(str, 'utf-8')
+    }
+  )
+  redirected.set(
+    '<electron>.secureStorage.decryptString',
+    /**
+     * Redirect for secureStorage.decryptString to not do any decryption.
+     * @param {Function} target - The original decryptString function
+     * @param {any} thisArg - The this context
+     * @param {[Buffer]} argArray - Function arguments
+     * @returns {string} The decrypted string
+     */
+    (target, thisArg, argArray) => {
+      const buffer = argArray[0]
+      return buffer.toString('utf-8')
+    }
+  )
+}
 
 /** Marker that allows us to detect and unwrap our Proxy instances. */
 const PROXIED = Symbol('taut:proxied')
@@ -100,11 +136,12 @@ function prop(p) {
  * @returns {T} The wrapped proxy or the original value if not wrappable
  */
 function wrap(obj, module, log) {
-  if (typeof obj !== 'object' && typeof obj !== 'function') {
+  if (
+    !((typeof obj === 'object' && obj !== null) || typeof obj === 'function')
+  ) {
     return obj
   }
 
-  // @ts-ignore - Proxy typing is complex with generics
   return new Proxy(obj, {
     get(target, p, receiver) {
       const newLog = `${log}.${prop(p)}`
@@ -121,7 +158,7 @@ function wrap(obj, module, log) {
 
         return wrap(val, module, newLog)
       } catch (err) {
-        console.warn(`taut loader get ${newLog} failed`, err)
+        console.log(`taut loader get ${newLog} failed`, err)
       }
     },
 
@@ -131,6 +168,7 @@ function wrap(obj, module, log) {
         return Reflect.has(target, p)
       } catch (err) {
         console.warn(`taut loader has ${log} failed`, err)
+        return false
       }
     },
 
@@ -139,6 +177,7 @@ function wrap(obj, module, log) {
         return Reflect.set(target, p, newValue, unproxy(receiver))
       } catch (err) {
         console.warn(`taut loader set ${log}.${prop(p)} failed`, err)
+        return false
       }
     },
 
@@ -175,14 +214,6 @@ function wrap(obj, module, log) {
     },
   })
 }
-
-// // Hide our proxies from util.types.isProxy to avoid detection.
-// redirected.set('<node:util>.types.isProxy', (target, ts, args) => {
-//   if (isProxied(args[0])) {
-//     return false
-//   }
-//   return Reflect.apply(target, ts, args)
-// })
 
 // @ts-ignore - Module._load is an internal Node.js API
 const oldLoad = Module._load
