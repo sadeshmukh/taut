@@ -448,6 +448,13 @@ export async function copyJsToConfigDir() {
     await fs.copyFile(defaultConfigPath, configFilePath)
   }
 
+  // Create default user.css if it doesn't exist
+  const userCssPath = path.join(configDir, 'user.css')
+  if (!existsSync(userCssPath)) {
+    const defaultUserCssPath = path.join(__dirname, 'default-user.css')
+    await fs.copyFile(defaultUserCssPath, userCssPath)
+  }
+
   console.log('✅ Taut files copied successfully!')
 }
 

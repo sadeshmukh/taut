@@ -18,6 +18,7 @@ const TAUT_DIR = path.join(__dirname, '..')
 const PLUGINS_DIR = path.join(TAUT_DIR, 'plugins')
 const USER_PLUGINS_DIR = path.join(TAUT_DIR, 'user-plugins')
 const CONFIG_PATH = path.join(TAUT_DIR, 'config.jsonc')
+const USER_CSS_PATH = path.join(TAUT_DIR, 'user.css')
 const WASM_PATH = path.join(TAUT_DIR, 'core', 'deps', 'esbuild.wasm')
 const CLIENT_JS_PATH = path.join(TAUT_DIR, 'core', 'client.js')
 
@@ -129,6 +130,43 @@ function watchConfig() {
 }
 
 /**
+ * Read the user.css file
+ * @returns {string} The user.css contents, or empty string if not found
+ */
+function readUserCss() {
+  try {
+    if (fs.existsSync(USER_CSS_PATH)) {
+      return fs.readFileSync(USER_CSS_PATH, 'utf8')
+    }
+  } catch (err) {
+    console.error('[Taut] Failed to read user.css:', err)
+  }
+  return ''
+}
+
+/**
+ * Send user.css to the renderer
+ */
+function sendUserCss() {
+  const css = readUserCss()
+  if (BROWSER) {
+    console.log('[Taut] Sending user.css')
+    BROWSER.webContents.send('taut:user-css-changed', css)
+  }
+}
+
+/**
+ * Start watching user.css file for changes
+ */
+function watchUserCss() {
+  console.log('[Taut] Watching user.css file:', USER_CSS_PATH)
+  fs.watchFile(USER_CSS_PATH, () => {
+    console.log('[Taut] user.css file changed')
+    sendUserCss()
+  })
+}
+
+/**
  * Start watching a plugin directory for new/updated files
  * @param {string} dir - Directory to watch
  */
@@ -229,8 +267,12 @@ electron.ipcMain.handle('taut:start-plugins', async () => {
 
     // Start watching for changes
     watchConfig()
+    watchUserCss()
     watchPluginDir(PLUGINS_DIR)
     watchPluginDir(USER_PLUGINS_DIR)
+
+    // Send initial user.css
+    sendUserCss()
 
     console.log(`[Taut] Started plugins`)
   } catch (err) {
