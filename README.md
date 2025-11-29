@@ -1,12 +1,17 @@
 # Taut
 
-Client mod for Slack :D
+`npx taut-cli` - Client mod for Slack :D
+
+For developers:
 
 ```sh
 # Also works with npm
-bun i
-bun run build
-bun ./cli/cli.js
+bun i && bun run build
+
+bun cli
+# link globally
+bun link
+taut
 ```
 
 ## Credits

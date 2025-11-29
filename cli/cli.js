@@ -10,7 +10,7 @@ import {
   getBinaryFuses,
   getAsarInfo,
   PATCH_VERSION,
-} from './patch'
+} from './patch.js'
 
 /**
  * Main entry point for the Taut CLI installer

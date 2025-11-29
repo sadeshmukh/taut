@@ -1,14 +1,15 @@
 {
-  "name": "taut-installer",
+  "name": "taut-cli",
   "version": "1.0.0",
   "description": "Installer for Taut",
   "type": "module",
   "bin": {
-    "taut-installer": "./cli/cli.js",
+    "taut-cli": "./cli/cli.js",
     "taut": "./cli/cli.js"
   },
   "scripts": {
-    "build": "bun build ./core/deps.ts --target node --format cjs --keep-names --outfile ./core/deps/deps.bundle.js && cp ./node_modules/esbuild-wasm/esbuild.wasm ./core/deps/esbuild.wasm"
+    "build": "bun build ./core/deps.ts --target node --format cjs --keep-names --outfile ./core/deps/deps.bundle.js && cp ./node_modules/esbuild-wasm/esbuild.wasm ./core/deps/esbuild.wasm",
+    "cli": "./cli/cli.js"
   },
   "keywords": [
     "taut",

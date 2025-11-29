@@ -12,7 +12,7 @@ import {
   getCurrentFuseWire,
   FuseState,
 } from '@electron/fuses'
-import { configDir } from './helpers'
+import { configDir } from './helpers.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
