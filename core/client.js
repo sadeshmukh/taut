@@ -7,13 +7,14 @@
 
   /** @import { TautAPI } from './preload.cjs' */
   /** @import { TautPlugin, TautPluginConstructor } from './Plugin' */
+  /** @import { TautPluginConfig } from './main.cjs' */
 
   /**
    * Plugin Manager - loads and manages Taut plugins
    */
   class PluginManager {
     constructor() {
-      /** @type {Map<string, any>} */
+      /** @type {Map<string, { PluginClass: TautPluginConstructor, instance: TautPlugin, config: TautPluginConfig }>} */
       this.plugins = new Map()
 
       // @ts-ignore
@@ -31,72 +32,83 @@
     async init() {
       console.log('[Taut] PluginManager initializing...')
 
+      this.api.onConfigChange((name, newConfig) => {
+        this.updatePluginConfig(name, newConfig)
+      })
       await this.api.startPlugins()
     }
 
     /**
-     * Load a single plugin
+     * Load a plugin
+     * Called by code injected by the main process
      * @param {string} name - Plugin name
      * @param {TautPluginConstructor} PluginClass - Plugin class (constructor)
-     * @param {object} config - Plugin configuration
+     * @param {TautPluginConfig} config - Plugin configuration
      */
-    async loadPlugin(name, PluginClass, config) {
+    loadPlugin(name, PluginClass, config) {
       console.log(`[Taut] Loading plugin: ${name}`)
 
-      if (this.plugins.has(name)) {
-        this.stopPlugin(name)
-        this.plugins.delete(name)
+      const existing = this.plugins.get(name)
+      if (existing && existing.config.enabled) {
+        try {
+          existing.instance.stop()
+        } catch (err) {
+          console.error(`[Taut] Error stopping existing plugin ${name}:`, err)
+        }
       }
 
       try {
         /** @type {TautPlugin} */
         const instance = new PluginClass(this.api, config)
-        this.plugins.set(name, instance)
-
-        if (typeof instance.start === 'function') {
-          instance.start()
+        this.plugins.set(name, { PluginClass, instance, config })
+        if (config.enabled) {
+          try {
+            instance.start()
+            console.log(`[Taut] Plugin ${name} started successfully`)
+          } catch (err) {
+            console.error(`[Taut] Error starting plugin ${name}:`, err)
+          }
         }
-        
-        console.log(`[Taut] Plugin ${name} started successfully`)
       } catch (err) {
         console.error(`[Taut] Error loading plugin ${name}:`, err)
-        throw err
       }
     }
 
     /**
-     * Stop all plugins
-     */
-    stopAll() {
-      for (const [name, instance] of this.plugins) {
-        try {
-          if (typeof instance.stop === 'function') {
-            instance.stop()
-          }
-          console.log(`[Taut] Plugin ${name} stopped`)
-        } catch (err) {
-          console.error(`[Taut] Error stopping plugin ${name}:`, err)
-        }
-      }
-      this.plugins.clear()
-    }
-
-    /**
-     * Stop a specific plugin
+     * Update a plugin's config and start/restart/stop as needed
      * @param {string} name - Plugin name
+     * @param {TautPluginConfig} newConfig - New plugin configuration
      */
-    stopPlugin(name) {
-      const instance = this.plugins.get(name)
-      if (instance) {
+    updatePluginConfig(name, newConfig) {
+      console.log(`[Taut] Updating config for plugin: ${name}`)
+      
+      const existing = this.plugins.get(name)
+      if (!existing) {
+        console.warn(`[Taut] Plugin ${name} not loaded, cannot update config`)
+        return
+      }
+
+      if (existing.config.enabled) {
         try {
-          if (typeof instance.stop === 'function') {
-            instance.stop()
-          }
-          console.log(`[Taut] Plugin ${name} stopped`)
+          existing.instance.stop()
         } catch (err) {
           console.error(`[Taut] Error stopping plugin ${name}:`, err)
         }
       }
+
+      const instance = new existing.PluginClass(this.api, newConfig)
+      this.plugins.set(name, { PluginClass: existing.PluginClass, instance, config: newConfig })
+      
+      if (newConfig.enabled) {
+        try {
+          instance.start()
+          console.log(`[Taut] Plugin ${name} started successfully with new config`)
+        } catch (err) {
+          console.error(`[Taut] Error starting plugin ${name} with new config:`, err)
+        }
+      }
+
+      console.log(`[Taut] Plugin ${name} config updated`)
     }
   }
 

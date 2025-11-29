@@ -34,9 +34,15 @@ const PLUGIN_EXTENSIONS = ['.js', '.cjs', '.mjs', '.ts', '.cts', '.mts']
 let originalPreloadContents = null
 
 /**
- * @typedef {Object} TautConfig
- * @property {Record<string, ({ enabled: boolean } & Record<string, unknown>) | unknown>} plugins
+ * @typedef {{ enabled: boolean } & Record<string, unknown>} TautPluginConfig
  */
+/**
+ * @typedef {Object} TautConfig
+ * @property {Record<string, TautPluginConfig | undefined>} plugins
+ */
+
+/** @type {TautConfig} */
+let config = { plugins: {} }
 
 /**
  * Read the config file, or return default config if it doesn't exist
@@ -52,6 +58,110 @@ function readConfig() {
     console.error('[Taut] Failed to read config:', err)
   }
   return { plugins: {} }
+}
+
+/**
+ * Bundle a plugin file and send it to the renderer process
+ * @param {string} filePath - Absolute path to the plugin file
+ * @returns {Promise<void>}
+ */
+async function bundleAndSendPlugin(filePath) {
+  const name = getPluginName(filePath)
+  const pluginConfig = config.plugins[name]
+
+  try {
+    const iife = await bundle(filePath)
+
+    const code = `globalThis.__tautPluginManager.loadPlugin(${JSON.stringify(
+      name
+    )}, ${iife}.default, ${JSON.stringify(pluginConfig)})`
+    if (!BROWSER) {
+      throw new Error('Browser window not initialized')
+    }
+    await BROWSER.webContents.executeJavaScript(code)
+    console.log(`[Taut] Plugin ${name} sent successfully`)
+  } catch (err) {
+    console.error(`[Taut] Failed to bundle plugin ${name}:`, err)
+  }
+}
+
+/**
+ * Check if a file has a valid plugin extension
+ * @param {string} filename
+ * @returns {boolean}
+ */
+function isValidPluginFile(filename) {
+  const ext = path.extname(filename)
+  return PLUGIN_EXTENSIONS.includes(ext)
+}
+
+/**
+ * Start watching config file for changes
+ */
+function watchConfig() {
+  console.log('[Taut] Watching config file:', CONFIG_PATH)
+  fs.watchFile(CONFIG_PATH, () => {
+    console.log('[Taut] Config file changed')
+    const newConfig = readConfig()
+    const oldPluginConfigs = config.plugins || {}
+    const newPluginConfigs = newConfig.plugins || {}
+
+    // Check each plugin to see if its config changed
+    const allPluginNames = new Set([
+      ...Object.keys(oldPluginConfigs),
+      ...Object.keys(newPluginConfigs),
+    ])
+
+    for (const name of allPluginNames) {
+      const oldPluginConfig = oldPluginConfigs[name]
+      const newPluginConfig = newPluginConfigs[name]
+
+      if (!deepEqual(oldPluginConfig, newPluginConfig)) {
+        console.log(`[Taut] Config changed for plugin: ${name}`)
+        if (BROWSER) {
+          BROWSER.webContents.send('taut:config-changed', name, newPluginConfig)
+        }
+      }
+    }
+
+    config = newConfig
+  })
+}
+
+/**
+ * Start watching a plugin directory for new/updated files
+ * @param {string} dir - Directory to watch
+ */
+function watchPluginDir(dir) {
+  try {
+    if (!fs.existsSync(dir)) {
+      console.log(`[Taut] Plugin directory does not exist, creating: ${dir}`)
+      fs.mkdirSync(dir, { recursive: true })
+    }
+
+    console.log('[Taut] Watching plugin directory:', dir)
+    fs.watch(dir, async (eventType, filename) => {
+      if (!filename || !isValidPluginFile(filename)) return
+
+      const filePath = path.join(dir, filename)
+      console.log(`[Taut] Plugin file ${eventType}: ${filename}`)
+
+      // Check if file exists (it might have been deleted)
+      if (!fs.existsSync(filePath)) {
+        console.log(`[Taut] Plugin file deleted: ${filename}`)
+        return
+      }
+
+      if (!esbuildInitialized) {
+        await initEsbuild(WASM_PATH)
+        esbuildInitialized = true
+      }
+
+      await bundleAndSendPlugin(filePath)
+    })
+  } catch (err) {
+    console.error(`[Taut] Failed to watch plugin dir ${dir}:`, err)
+  }
 }
 
 /**
@@ -98,8 +208,8 @@ electron.ipcMain.handle('taut:start-plugins', async () => {
       esbuildInitialized = true
     }
 
-    const config = readConfig()
-    const pluginConfigs = config.plugins || {}
+    // Read and store config
+    config = readConfig()
 
     // Scan both plugin directories
     const pluginFiles = [
@@ -114,25 +224,13 @@ electron.ipcMain.handle('taut:start-plugins', async () => {
     )
 
     for (const filePath of pluginFiles) {
-      const name = getPluginName(filePath)
-      const pluginConfig = pluginConfigs[name]
-
-      try {
-        const iife = await bundle(filePath)
-
-        const code = `globalThis.__tautPluginManager.loadPlugin(${JSON.stringify(
-          name
-        )}, ${iife}.default, ${JSON.stringify(pluginConfig)})`
-        if (!BROWSER) {
-          throw new Error('Browser window not initialized')
-        }
-        await BROWSER.webContents.executeJavaScript(code)
-        console.log(`[Taut] Plugin ${name} sent successfully`)
-
-      } catch (err) {
-        console.error(`[Taut] Failed to bundle plugin ${name}:`, err)
-      }
+      await bundleAndSendPlugin(filePath)
     }
+
+    // Start watching for changes
+    watchConfig()
+    watchPluginDir(PLUGINS_DIR)
+    watchPluginDir(USER_PLUGINS_DIR)
 
     console.log(`[Taut] Started plugins`)
   } catch (err) {
@@ -289,6 +387,40 @@ redirected.set(
    */
   (target, thisArg, argArray) => {}
 )
+
+/**
+ * Deep equality for JSON-serializable values
+ * @param {unknown} left - first value to compare
+ * @param {unknown} right - second value to compare
+ * @returns {boolean} true if values are deeply equal
+ */
+function deepEqual(left, right) {
+  if (left === right) return true
+  if (Number.isNaN(left) && Number.isNaN(right)) return true
+  if (left == null || right == null) return false
+  if (typeof left !== typeof right) return false
+  if (typeof left !== 'object') return left === right
+
+  if (Array.isArray(left) && Array.isArray(right)) {
+    if (left.length !== right.length) return false
+    for (let i = 0; i < left.length; i++) {
+      if (!deepEqual(left[i], right[i])) return false
+    }
+    return true
+  }
+  if (Array.isArray(left) !== Array.isArray(right)) return false
+
+  let keyCount = 0
+  for (const key in left) {
+    if (Object.prototype.hasOwnProperty.call(left, key)) {
+      keyCount++
+      if (!Object.prototype.hasOwnProperty.call(right, key)) return false
+      // @ts-ignore
+      if (!deepEqual(left[key], right[key])) return false
+    }
+  }
+  return Object.keys(right).length === keyCount
+}
 
 // Proxy wrapper code
 

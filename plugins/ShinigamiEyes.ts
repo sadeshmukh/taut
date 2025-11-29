@@ -2,7 +2,7 @@
 // Shows Hackatime trust level indicators next to user names in Slack
 // Author: @ImShyMike :3
 
-import { TautPlugin } from '../core/Plugin'
+import { TautPlugin, type TautPluginConfig, type TautAPI } from '../core/Plugin'
 
 const API_URL = 'https://hackatime.hackclub.com/api/admin/v1/execute'
 const CACHE_KEY = 'shinigami_trust_levels'
@@ -33,7 +33,7 @@ export default class ShinigamiEyes extends TautPlugin {
   private boundHandleTrustHover: (event: MouseEvent) => void
   private boundHandleTrustLeave: (event: MouseEvent) => void
 
-  constructor(api: any, config: object) {
+  constructor(api: any, config: TautPluginConfig) {
     super(api, config)
     this.boundHandleTrustHover = this.handleTrustHover.bind(this)
     this.boundHandleTrustLeave = this.handleTrustLeave.bind(this)
@@ -77,14 +77,34 @@ export default class ShinigamiEyes extends TautPlugin {
     // Remove any active tooltip
     this.hideTooltip()
     
-    // Remove event listeners from all trusted buttons
+    // Clean up all modified buttons
     const trustedButtons = document.querySelectorAll<HTMLButtonElement>(
       'button.c-message__sender_button[data-trusted="true"]'
     )
     trustedButtons.forEach((btn) => {
       btn.removeEventListener('mouseenter', this.boundHandleTrustHover)
       btn.removeEventListener('mouseleave', this.boundHandleTrustLeave)
+      
+      // Reset cursor style
+      btn.style.cursor = ''
+      
+      // Remove the emoji prefix from the button text
+      const firstChild = btn.firstChild
+      if (firstChild && firstChild.nodeType === Node.TEXT_NODE) {
+        const text = firstChild.textContent || ''
+        // Match any trust emoji followed by a space at the start
+        const emojiPattern = /^(🔵|🔴|🟢|🟡|⚠️) /
+        if (emojiPattern.test(text)) {
+          firstChild.remove()
+        }
+      }
+      
+      // Remove the data attribute
+      delete btn.dataset.trusted
     })
+    
+    // Clear trust levels cache from memory
+    this.trustLevels = {}
   }
 
   // Cache Management

@@ -1,6 +1,10 @@
 // Abstract base class for all Taut plugins
 
 import type { TautAPI } from './preload.cjs'
+import type { TautPluginConfig } from './main.cjs'
+
+export type { TautAPI } from './preload.cjs'
+export type { TautPluginConfig } from './main.cjs'
 
 /**
  * Abstract base class that all Taut plugins must extend.
@@ -8,13 +12,13 @@ import type { TautAPI } from './preload.cjs'
  */
 export abstract class TautPlugin {
   protected api: TautAPI
-  protected config: object
+  protected config: TautPluginConfig
 
   /**
    * @param api - The TautAPI instance for plugin communication
    * @param config - The plugin's configuration from config.jsonc
    */
-  constructor(api: TautAPI, config: object) {
+  constructor(api: TautAPI, config: TautPluginConfig) {
     this.api = api
     this.config = config
   }
@@ -35,11 +39,11 @@ export abstract class TautPlugin {
 
   /**
    * Log a message with the plugin's name prefix.
-   * @param args - Arguments to log
+   * @param args - Something to log
    */
   protected log(...args: any[]): void {
-    console.log(`[${this.constructor.name}]`, ...args)
-    this.api.log(`[${this.constructor.name}]`, ...args)
+    console.log(`[Taut] [${this.constructor.name}]`, ...args)
+    this.api.logMain(`[${this.constructor.name}]`, ...args)
   }
 }
 

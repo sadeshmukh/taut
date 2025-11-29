@@ -4,8 +4,8 @@
   
   "plugins": {
     "ShinigamiEyes": {
-      "enabled": true,
-      // Get your API token from Hackatime admin
+      "enabled": false,
+      // https://hackatime.hackclub.com/admin/admin_api_keys
       "apiToken": ""
     }
   }
