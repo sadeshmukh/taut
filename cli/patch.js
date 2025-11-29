@@ -12,7 +12,7 @@ import {
   getCurrentFuseWire,
   FuseState,
 } from '@electron/fuses'
-import { configDir } from 'helpers'
+import { configDir } from './helpers'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -413,18 +413,42 @@ async function resign(resourcesDir) {
 }
 
 export async function copyJsToConfigDir() {
-  console.log('📋 Copying JS files to config directory...')
+  console.log('📋 Copying Taut files to config directory...')
 
-  const sourceDir = path.join(__dirname, 'js')
-  const depsDir = path.join(__dirname, 'deps')
-  const destDir = path.join(configDir, 'js')
+  const coreSourceDir = path.join(__dirname, '..', 'core')
+  const pluginsSourceDir = path.join(__dirname, '..', 'plugins')
+  
+  const coreDestDir = path.join(configDir, 'core')
+  const pluginsDestDir = path.join(configDir, 'plugins')
+  const userPluginsDestDir = path.join(configDir, 'user-plugins')
+  const configFilePath = path.join(configDir, 'config.jsonc')
 
+  // Remove old core directory and copy fresh
   try {
-    await fs.rm(destDir, { recursive: true, force: true })
+    await fs.rm(coreDestDir, { recursive: true, force: true })
   } catch {}
-  await fs.mkdir(destDir, { recursive: true })
-  await fs.cp(sourceDir, destDir, { recursive: true })
-  await fs.cp(depsDir, path.join(destDir, 'deps'), { recursive: true })
+  await fs.mkdir(coreDestDir, { recursive: true })
+  await fs.cp(coreSourceDir, coreDestDir, { recursive: true })
+
+  // Remove old plugins directory and copy fresh
+  try {
+    await fs.rm(pluginsDestDir, { recursive: true, force: true })
+  } catch {}
+  await fs.mkdir(pluginsDestDir, { recursive: true })
+  await fs.cp(pluginsSourceDir, pluginsDestDir, { recursive: true })
+
+  // Create user-plugins directory if it doesn't exist
+  if (!existsSync(userPluginsDestDir)) {
+    await fs.mkdir(userPluginsDestDir, { recursive: true })
+  }
+
+  // Create default config.jsonc if it doesn't exist
+  if (!existsSync(configFilePath)) {
+    const defaultConfigPath = path.join(__dirname, 'default-config.jsonc')
+    await fs.copyFile(defaultConfigPath, configFilePath)
+  }
+
+  console.log('✅ Taut files copied successfully!')
 }
 
 /**

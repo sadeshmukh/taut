@@ -1,0 +1,12 @@
+{
+  // Taut Plugin Configuration
+  // Edit this file to configure your plugins
+  
+  "plugins": {
+    "ShinigamiEyes": {
+      "enabled": true,
+      // Get your API token from Hackatime admin
+      "apiToken": ""
+    }
+  }
+}

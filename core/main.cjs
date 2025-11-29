@@ -1,11 +1,31 @@
+// Taut Main Process
 // Wraps Electron modules to inject custom behavior into Slack
 // Loaded by the app.asar shim patched into Slack
 
 const Module = require('module')
 const fs = require('fs')
+const path = require('path')
 const electron = require('electron')
 
-const result = require('./plugins.cjs')
+// @ts-ignore
+globalThis.self = globalThis
+/** @type {typeof import('./deps.ts')} */
+const deps = require('./deps/deps.bundle.js')
+const { initEsbuild, bundle, stopEsbuild, parseJSONC } = deps
+
+// Path to the taut directory (where this file lives when installed)
+const TAUT_DIR = path.join(__dirname, '..')
+const PLUGINS_DIR = path.join(TAUT_DIR, 'plugins')
+const USER_PLUGINS_DIR = path.join(TAUT_DIR, 'user-plugins')
+const CONFIG_PATH = path.join(TAUT_DIR, 'config.jsonc')
+const WASM_PATH = path.join(TAUT_DIR, 'core', 'deps', 'esbuild.wasm')
+const CLIENT_JS_PATH = path.join(TAUT_DIR, 'core', 'client.js')
+
+/** @type {boolean} */
+let esbuildInitialized = false
+
+/** Supported plugin file extensions */
+const PLUGIN_EXTENSIONS = ['.js', '.cjs', '.mjs', '.ts', '.cts', '.mts']
 
 /**
  * Cache for the original Slack preload script contents
@@ -13,7 +33,118 @@ const result = require('./plugins.cjs')
  */
 let originalPreloadContents = null
 
-// IPC handler for renderer to request original preload contents
+/**
+ * @typedef {Object} TautConfig
+ * @property {Record<string, ({ enabled: boolean } & Record<string, unknown>) | unknown>} plugins
+ */
+
+/**
+ * Read the config file, or return default config if it doesn't exist
+ * @returns {TautConfig}
+ */
+function readConfig() {
+  try {
+    if (fs.existsSync(CONFIG_PATH)) {
+      const contents = fs.readFileSync(CONFIG_PATH, 'utf8')
+      return parseJSONC(contents)
+    }
+  } catch (err) {
+    console.error('[Taut] Failed to read config:', err)
+  }
+  return { plugins: {} }
+}
+
+/**
+ * Scan a directory for plugin files
+ * @param {string} dir
+ * @returns {string[]} Array of absolute paths to plugin files
+ */
+function scanPluginDir(dir) {
+  /** @type {string[]} */
+  const plugins = []
+  try {
+    if (!fs.existsSync(dir)) return plugins
+    const files = fs.readdirSync(dir)
+    console.log(`[Taut] Scanning plugin dir: ${dir}`, files)
+    for (const file of files) {
+      const ext = path.extname(file)
+      console.log(`[Taut] plugin`, file, ext, PLUGIN_EXTENSIONS.includes(ext))
+      if (PLUGIN_EXTENSIONS.includes(ext)) {
+        plugins.push(path.join(dir, file))
+      }
+    }
+  } catch (err) {
+    console.error(`[Taut] Failed to scan plugin dir ${dir}:`, err)
+  }
+  return plugins
+}
+
+/**
+ * Get plugin name from file path
+ * @param {string} filePath
+ * @returns {string}
+ */
+function getPluginName(filePath) {
+  return path.basename(filePath, path.extname(filePath))
+}
+
+// IPC Handlers
+
+// Handler: Get all plugins (scans, compiles, returns code + config)
+electron.ipcMain.handle('taut:start-plugins', async () => {
+  console.log('[Taut] Starting plugins')
+  try {
+    // Initialize esbuild if not already done
+    if (!esbuildInitialized) {
+      await initEsbuild(WASM_PATH)
+      esbuildInitialized = true
+    }
+
+    const config = readConfig()
+    const pluginConfigs = config.plugins || {}
+
+    // Scan both plugin directories
+    const pluginFiles = [
+      ...scanPluginDir(PLUGINS_DIR),
+      ...scanPluginDir(USER_PLUGINS_DIR),
+    ]
+    console.log(
+      `[Taut] Found ${pluginFiles.length} plugin files:`,
+      pluginFiles,
+      PLUGINS_DIR,
+      USER_PLUGINS_DIR
+    )
+
+    for (const filePath of pluginFiles) {
+      const name = getPluginName(filePath)
+      const pluginConfig = pluginConfigs[name]
+
+      try {
+        console.log(`[Taut] Bundling plugin: ${name}`)
+        const iife = await bundle(filePath)
+
+        const code = `globalThis.__tautPluginManager.loadPlugin(${JSON.stringify(
+          name
+        )}, ${iife}.default, ${JSON.stringify(pluginConfig)})`
+        if (!BROWSER) {
+          throw new Error('Browser window not initialized')
+        }
+        await BROWSER.webContents.executeJavaScript(code)
+        console.log(`[Taut] Plugin ${name} started successfully`)
+
+      } catch (err) {
+        console.error(`[Taut] Failed to bundle plugin ${name}:`, err)
+      }
+    }
+
+    console.log(`[Taut] Started plugins`)
+  } catch (err) {
+    console.error('[Taut] Failed to get plugins:', err)
+    return []
+  }
+})
+
+// Handler: Get original preload contents (for preload.cjs)
 electron.ipcMain.handle('taut:get-original-preload', () => {
   return originalPreloadContents
 })
@@ -29,24 +160,24 @@ let BROWSER
  * @type {RegExp[]}
  */
 const modules = [/^electron.*$/]
+
 /**
  * Map of function paths to their redirect handlers
- * Keys are in the format '<module>.ClassName.<constructor>' or '<module>.ClassName.methodName'
  * @type {Map<string, Function>}
  */
 const redirected = new Map()
-// Inject our script
+
+// Redirect BrowserWindow constructor to inject our preload and setup CSP stripping
 redirected.set(
   '<electron>.BrowserWindow.<constructor>',
   /**
-   * Redirect for BrowserWindow constructor to inject our script
-   * @param {typeof electron.BrowserWindow} target - The original BrowserWindow constructor
-   * @param {[electron.BrowserWindowConstructorOptions?]} args - Constructor arguments
-   * @param {Function} newTarget - The new.target value
-   * @returns {electron.BrowserWindow} The constructed BrowserWindow instance
+   * @param {typeof electron.BrowserWindow} target
+   * @param {[electron.BrowserWindowConstructorOptions?]} args
+   * @param {Function} newTarget
+   * @returns {electron.BrowserWindow}
    */
   (target, [options], newTarget) => {
-    console.log('!!! constructing window', options)
+    console.log('[Taut] Constructing BrowserWindow')
     if (typeof options !== 'object') {
       options = {}
     }
@@ -60,95 +191,41 @@ redirected.set(
     if (originalPreloadPath) {
       try {
         originalPreloadContents = fs.readFileSync(originalPreloadPath, 'utf8')
-        console.log('!!! read original preload from', originalPreloadPath)
+        console.log('[Taut] Cached original preload from:', originalPreloadPath)
       } catch (err) {
-        console.error('!!! failed to read original preload', err)
+        console.error('[Taut] Failed to read original preload:', err)
         originalPreloadContents = null
       }
     }
 
+    // Use our custom preload
     options.webPreferences.preload = require.resolve('./preload.cjs')
-
-    console.log('!!! final opts', options)
 
     BROWSER = Reflect.construct(target, [options], newTarget)
     if (!BROWSER) {
       throw new Error('Failed to create BrowserWindow')
     }
 
+    // Inject client.js on page load
+    BROWSER.webContents.on('did-finish-load', async () => {
+      try {
+        if (fs.existsSync(CLIENT_JS_PATH)) {
+          const clientJs = fs.readFileSync(CLIENT_JS_PATH, 'utf8')
+          console.log('[Taut] Injecting client.js')
+          await BROWSER?.webContents.executeJavaScript(clientJs)
+        } else {
+          console.error('[Taut] client.js not found at:', CLIENT_JS_PATH)
+        }
+      } catch (err) {
+        console.error('[Taut] Failed to inject client.js:', err)
+      }
+    })
+
     return BROWSER
   }
 )
 
-// redirected.set(
-//   '<electron>.app.enableSandbox',
-//   /**
-//    * Redirect for app.enableSandbox to be a no-op
-//    * @param {Function} target - The original enableSandbox function
-//    * @param {any} thisArg - The this context
-//    * @param {[]} argArray - Function arguments
-//    */
-//   (target, thisArg, argArray) => {
-//     console.log('!!! app.enableSandbox called - no-op')
-//   }
-// )
-
-// // contextBridge is incompatible with nodeIntegration: true
-// // we fake it instead
-// redirected.set(
-//   '<electron>.contextBridge.exposeInMainWorld',
-//   /**
-//    * Redirect for contextBridge.exposeInMainWorld
-//    * @param {Function} target - The original exposeInMainWorld function
-//    * @param {any} thisArg - The this context
-//    * @param {[string, any]} argArray - Function arguments
-//    */
-//   (target, thisArg, [apiKey, api]) => {
-//     console.log(
-//       '!!! contextBridge.exposeInMainWorld called',
-//       apiKey
-//     )
-//     // @ts-ignore
-//     global[apiKey] = api
-//   }
-// )
-// redirected.set(
-//   '<electron>.contextBridge.exposeInIsolatedWorld',
-//   /**
-//    * Redirect for contextBridge.exposeInIsolatedWorld
-//    * @param {Function} target - The original exposeInIsolatedWorld function
-//    * @param {any} thisArg - The this context
-//    * @param {[number, string, any]} argArray - Function arguments
-//    */
-//   (target, thisArg, [worldId, apiKey, api]) => {
-//     console.log(
-//       '!!! contextBridge.exposeInIsolatedWorld called',
-//       worldId,
-//       apiKey
-//     )
-//     // @ts-ignore
-//     global[apiKey] = api
-//   }
-// )
-// redirected.set(
-//   '<electron>.contextBridge.executeInMainWorld',
-//   /**
-//    * Redirect for contextBridge.executeInMainWorld
-//    * @param {Function} target - The original executeInMainWorld function
-//    * @param {any} thisArg - The this context
-//    * @param {[{func: Function, args: any[]}]} argArray - Function arguments
-//    */
-//   (target, thisArg, [{func, args}]) => {
-//     console.log(
-//       '!!! contextBridge.executeInMainWorld called',
-//       func,
-//       args
-//     )
-//     return func(...args)
-//   }
-// )
-
-// Use a custom application menu to add Taut options
+// Custom application menu with Taut options
 electron.Menu.setApplicationMenu(
   electron.Menu.buildFromTemplate(
     /** @type {electron.MenuItemConstructorOptions[]} */ ([
@@ -216,7 +293,7 @@ redirected.set(
   (target, thisArg, argArray) => {}
 )
 
-// Code to create the Proxy wrappers
+// Proxy wrapper code
 
 /** Marker that allows us to detect and unwrap our Proxy instances. */
 const PROXIED = Symbol('taut:proxied')

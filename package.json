@@ -4,16 +4,12 @@
   "description": "Installer for Taut",
   "type": "module",
   "bin": {
-    "taut-installer": "./cli.js",
-    "taut": "./cli.js"
+    "taut-installer": "./cli/cli.js",
+    "taut": "./cli/cli.js"
   },
   "scripts": {
-    "build": "bun build ./deps.js --target node --format cjs --keep-names --outfile ./deps/deps.bundle.js && cp ./node_modules/esbuild-wasm/esbuild.wasm ./deps/esbuild.wasm"
+    "build": "bun build ./core/deps.ts --target node --format cjs --keep-names --outfile ./core/deps/deps.bundle.js && cp ./node_modules/esbuild-wasm/esbuild.wasm ./core/deps/esbuild.wasm"
   },
-  "files": [
-    "cli.js",
-    "loader.js"
-  ],
   "keywords": [
     "taut",
     "slack",
@@ -24,7 +20,8 @@
   "license": "MIT",
   "dependencies": {
     "@electron/asar": "^4.0.1",
-    "@electron/fuses": "^2.0.0"
+    "@electron/fuses": "^2.0.0",
+    "@types/resolve": "^1.20.6"
   },
   "devDependencies": {
     "@rollup/browser": "^4.53.3",
@@ -35,6 +32,8 @@
     "electron": "^39.2.4",
     "esbuild": "^0.27.0",
     "esbuild-wasm": "^0.27.0",
+    "jsonc-parser": "^3.3.1",
+    "resolve": "^1.22.11",
     "typescript": "^5.9.3"
   }
 }

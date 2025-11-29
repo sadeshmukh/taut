@@ -26,9 +26,9 @@ function osConfigDir() {
 }
 const configDir = path.join(osConfigDir(), 'taut')
 
-// Load the injector script
-const injectJs = path.join(configDir, 'js', 'inject.cjs')
-require(injectJs)
+// Load the Taut main process script
+const mainJs = path.join(configDir, 'core', 'main.cjs')
+require(mainJs)
 
 // Load the original Slack app
 // @ts-ignore
