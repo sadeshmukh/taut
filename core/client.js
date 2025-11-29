@@ -92,7 +92,6 @@
           if (typeof instance.stop === 'function') {
             instance.stop()
           }
-          this.plugins.delete(name)
           console.log(`[Taut] Plugin ${name} stopped`)
         } catch (err) {
           console.error(`[Taut] Error stopping plugin ${name}:`, err)

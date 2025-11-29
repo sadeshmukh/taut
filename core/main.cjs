@@ -65,10 +65,8 @@ function scanPluginDir(dir) {
   try {
     if (!fs.existsSync(dir)) return plugins
     const files = fs.readdirSync(dir)
-    console.log(`[Taut] Scanning plugin dir: ${dir}`, files)
     for (const file of files) {
       const ext = path.extname(file)
-      console.log(`[Taut] plugin`, file, ext, PLUGIN_EXTENSIONS.includes(ext))
       if (PLUGIN_EXTENSIONS.includes(ext)) {
         plugins.push(path.join(dir, file))
       }
@@ -120,7 +118,6 @@ electron.ipcMain.handle('taut:start-plugins', async () => {
       const pluginConfig = pluginConfigs[name]
 
       try {
-        console.log(`[Taut] Bundling plugin: ${name}`)
         const iife = await bundle(filePath)
 
         const code = `globalThis.__tautPluginManager.loadPlugin(${JSON.stringify(
@@ -130,7 +127,7 @@ electron.ipcMain.handle('taut:start-plugins', async () => {
           throw new Error('Browser window not initialized')
         }
         await BROWSER.webContents.executeJavaScript(code)
-        console.log(`[Taut] Plugin ${name} started successfully`)
+        console.log(`[Taut] Plugin ${name} sent successfully`)
 
       } catch (err) {
         console.error(`[Taut] Failed to bundle plugin ${name}:`, err)

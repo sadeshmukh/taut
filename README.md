@@ -3,11 +3,10 @@
 Client mod for Slack :D
 
 ```sh
-cd installer
+# Also works with npm
 bun i
 bun run build
-
-bun cli.js
+bun ./cli/cli.js
 ```
 
 ## Credits
