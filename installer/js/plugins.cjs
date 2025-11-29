@@ -18,12 +18,31 @@ async function getPlugins() {
       path.join(__dirname, 'deps/esbuild.wasm')
     )
 
+    const pluginsConfigPath = path.join(__dirname, 'plugins.json')
+    let enabledPlugins = null
+    try {
+      if (fs.existsSync(pluginsConfigPath)) {
+        const config = JSON.parse(fs.readFileSync(pluginsConfigPath, 'utf8'))
+        if (Array.isArray(config.enabled)) {
+          enabledPlugins = new Set(config.enabled)
+        }
+      }
+    } catch (e) {
+      console.error('Error reading plugins.json', e)
+    }
+
     const pluginFiles = (
       await fs.promises.readdir(path.join(__dirname, 'plugins'), {
         withFileTypes: true,
       })
     )
-      .filter((dirent) => dirent.isFile())
+      .filter((dirent) => {
+        if (!dirent.isFile()) return false
+        if (enabledPlugins) {
+          return enabledPlugins.has(dirent.name)
+        }
+        return true
+      })
       .map((dirent) => path.join(dirent.parentPath, dirent.name))
     console.log('!!! found plugin files:', pluginFiles)
 
