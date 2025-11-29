@@ -1,12 +1,12 @@
 import { TautPlugin, type TautPluginConfig } from '../core/Plugin'
 
 const IDV_API_URL = 'https://identity.hackclub.com/api/external/check'
-const IDV_CACHE_KEY = 'slack_idv_status'
-const IDV_CACHE_TIMESTAMP_KEY = 'slack_idv_status_timestamp'
+const IDV_CACHE_KEY = 'slack_idv_status_v2'
+const IDV_CACHE_TIMESTAMP_KEY = 'slack_idv_status_timestamp_v2'
 const IDV_CACHE_DURATION = 24 * 60 * 60 * 1000
 
 export default class IdvStatus extends TautPlugin {
-  private idvCache: Record<string, boolean> = {}
+  private idvCache: Record<string, string> = {}
   private stylesElement: HTMLStyleElement | null = null
   private observer: MutationObserver | null = null
 
@@ -38,8 +38,8 @@ export default class IdvStatus extends TautPlugin {
     )
     processedButtons.forEach((btn) => {
       delete btn.dataset.idvChecked
-      btn.classList.remove('taut-idv-not-eligible')
-      if (btn.title === 'IDV: Not Verified/Eligible') {
+      btn.classList.remove('taut-idv-not-eligible', 'taut-idv-over-18')
+      if (btn.title && btn.title.startsWith('IDV:')) {
         btn.title = ''
       }
     })
@@ -57,11 +57,25 @@ export default class IdvStatus extends TautPlugin {
       }
 
       .taut-idv-not-eligible .c-avatar__image,
-      .taut-idv-not-eligible img {
+      .taut-idv-not-eligible img,
+      .taut-idv-avatar-not-eligible img {
         outline: 2px solid #e01e5a !important;
         outline-offset: 2px !important;
         border-radius: 50% !important;
         box-shadow: 0 0 0 3px rgba(224,30,90,0.08) !important;
+      }
+
+      .taut-idv-over-18 {
+        color: #d97706 !important;
+      }
+
+      .taut-idv-over-18 .c-avatar__image,
+      .taut-idv-over-18 img,
+      .taut-idv-avatar-over-18 img {
+        outline: 2px solid #d97706 !important;
+        outline-offset: 2px !important;
+        border-radius: 50% !important;
+        box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.08) !important;
       }
     `
 
@@ -102,47 +116,93 @@ export default class IdvStatus extends TautPlugin {
     }
   }
 
-  private async fetchIdvStatus(slackId: string): Promise<boolean> {
-    if (typeof this.idvCache[slackId] === 'boolean')
-      return this.idvCache[slackId]
+  private async fetchIdvStatus(slackId: string): Promise<string> {
+    if (this.idvCache[slackId]) return this.idvCache[slackId]
 
-    let isEligible = false
+    let status = 'unverified'
     try {
       const response = await fetch(
         `https://corsproxy.io/?${IDV_API_URL}?slack_id=${slackId}`
       )
       const data = await response.json()
+      this.log('IDV API Response:', data)
 
-      if (response.ok && data.result && data.result.includes('eligible')) {
-        isEligible = true
+      if (response.ok && data.result) {
+        if (data.result.includes('eligible')) {
+          status = 'eligible'
+        } else if (data.result.includes('over_18')) {
+          status = 'over_18'
+        }
       }
     } catch (e) {
       this.log('Error fetching IDV status:', e)
     }
 
-    this.idvCache[slackId] = isEligible
+    this.idvCache[slackId] = status
     this.saveIdvCache()
-    return isEligible
+    return status
   }
 
   private async renderIdv(
     btn: HTMLButtonElement,
     slackId: string
   ): Promise<void> {
-    if (btn.dataset.idvChecked === 'true') return
+    // If we've already checked this button, verify the styling is still present
+    // This handles cases where React re-renders and strips classes but keeps attributes
+    if (btn.dataset.idvChecked === 'true') {
+      const hasClass =
+        btn.classList.contains('taut-idv-not-eligible') ||
+        btn.classList.contains('taut-idv-over-18')
+      
+      // If it has the class, we're good. If not, we need to re-apply.
+      // But only if we have a cached status to apply.
+      if (hasClass) return
+      
+      // If no class but checked, check if we have a status in cache to apply immediately
+      if (!this.idvCache[slackId]) return
+    }
+    
     btn.dataset.idvChecked = 'true'
 
-    const isEligible = await this.fetchIdvStatus(slackId)
+    const status = await this.fetchIdvStatus(slackId)
 
-    if (!isEligible) {
+    let avatarImg: HTMLImageElement | null = null
+    try {
+      const gutterRight = btn.closest('.c-message_kit__gutter__right')
+      if (gutterRight && gutterRight.parentElement) {
+        // left gutter avatar
+        const avatarContainer = gutterRight.parentElement.querySelector(
+          '.c-message_kit__gutter__left .c-message_kit__avatar'
+        )
+        if (avatarContainer) {
+          avatarImg = avatarContainer.querySelector('img')
+        }
+      }
+    } catch (e) {
+      // Ignore DOM traversal errors
+    }
+
+    if (status === 'unverified') {
       btn.classList.add('taut-idv-not-eligible')
       btn.title = 'IDV: Not Verified/Eligible'
+      if (avatarImg) {
+        avatarImg.parentElement?.classList.add('taut-idv-avatar-not-eligible')
+      }
+    } else if (status === 'over_18') {
+      btn.classList.add('taut-idv-over-18')
+      btn.title = 'IDV: Verified (Over 18)'
+      if (avatarImg) {
+        avatarImg.parentElement?.classList.add('taut-idv-avatar-over-18')
+      }
     }
   }
 
   private processIdvUsers(): void {
+    // Select ALL sender buttons, not just unchecked ones
+    // This allows us to catch elements where React stripped the class
+    // Updates are weird - it triggers re-renders when you wouldn't expect
     const senderButtons = document.querySelectorAll<HTMLButtonElement>(
-      'button.c-message__sender_button:not([data-idv-checked="true"])'
+      'button.c-message__sender_button'
     )
 
     senderButtons.forEach((btn) => {
