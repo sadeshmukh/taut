@@ -10,15 +10,21 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 // build all the plugins in the ./plugins directory
-;(async () => {
+async function getPlugins() {
+  const plugins = []
   try {
     console.log('!!! bundling plugins')
-    const esbuildInitPromise = initEsbuild('./deps/esbuild.wasm')
+    const esbuildInitPromise = initEsbuild(
+      path.join(__dirname, 'deps/esbuild.wasm')
+    )
 
-    const pluginFiles = (await fs.promises
-      .readdir(path.join(__dirname, 'plugins'), { withFileTypes: true }))
-      .filter(dirent => dirent.isFile())
-      .map(dirent => path.join(dirent.parentPath, dirent.name))
+    const pluginFiles = (
+      await fs.promises.readdir(path.join(__dirname, 'plugins'), {
+        withFileTypes: true,
+      })
+    )
+      .filter((dirent) => dirent.isFile())
+      .map((dirent) => path.join(dirent.parentPath, dirent.name))
     console.log('!!! found plugin files:', pluginFiles)
 
     await esbuildInitPromise
@@ -26,15 +32,14 @@ const path = require('node:path')
       console.log('!!! bundling plugin:', file)
       const bundled = await bundle(file)
       console.log('!!! bundled plugin:', file, bundled.slice(0, 100))
-      // await fs.promises.writeFile(
-      //   path.join(__dirname, 'dist', 'plugins', file),
-      //   bundled,
-      //   'utf-8'
-      // )
+      plugins.push({ name: path.basename(file), code: bundled })
     }
     await stopEsbuild()
     console.log('!!! finished bundling plugins')
   } catch (err) {
     console.error('!!! error bundling plugins:', err)
   }
-})()
+  return plugins
+}
+
+module.exports = { getPlugins }

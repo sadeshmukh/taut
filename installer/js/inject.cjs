@@ -5,7 +5,7 @@ const Module = require('module')
 const fs = require('fs')
 const electron = require('electron')
 
-const result = require('./plugins.cjs')
+const { getPlugins } = require('./plugins.cjs')
 
 /**
  * Cache for the original Slack preload script contents
@@ -16,6 +16,11 @@ let originalPreloadContents = null
 // IPC handler for renderer to request original preload contents
 electron.ipcMain.handle('taut:get-original-preload', () => {
   return originalPreloadContents
+})
+
+// IPC handler for renderer to request plugins
+electron.ipcMain.handle('taut:get-plugins', async () => {
+  return await getPlugins()
 })
 
 /**

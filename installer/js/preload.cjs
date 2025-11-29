@@ -12,4 +12,14 @@ console.log('!!! preload loaded')
     console.log('!!! evaluating original preload script')
     eval(originalPreload)
   }
+
+  const plugins = await ipcRenderer.invoke('taut:get-plugins')
+  for (const plugin of plugins) {
+    console.log('!!! executing plugin:', plugin.name)
+    try {
+      eval(plugin.code)
+    } catch (err) {
+      console.error('!!! error executing plugin:', plugin.name, err)
+    }
+  }
 })()
