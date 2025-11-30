@@ -1,4 +1,3 @@
-// Shinigami Eyes plugin for Taut
 // Shows Hackatime trust level indicators next to user names in Slack
 // Author: @ImShyMike :3
 

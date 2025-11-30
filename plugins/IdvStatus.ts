@@ -1,3 +1,6 @@
+// Marks users who aren't IDV verified as eligible in red
+// Author: Sahil (https://github.com/sahil)
+
 import { TautPlugin, type TautPluginConfig, type TautAPI } from '../core/Plugin'
 
 const IDV_API_URL = 'https://identity.hackclub.com/api/external/check'

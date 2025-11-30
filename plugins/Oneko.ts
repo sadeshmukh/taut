@@ -1,3 +1,6 @@
+// Adds a little cat that chases your cursor around the screen
+// Based on oneko.js by @adryd325 (https://github.com/adryd325/oneko.js)
+
 import { TautPlugin, type TautPluginConfig, type TautAPI } from '../core/Plugin'
 
 const NEKO_FILE =
