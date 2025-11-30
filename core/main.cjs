@@ -421,14 +421,23 @@ electron.app.whenReady().then(() => {
       }
 
       if (shouldModify) {
-        // Remove existing ACAO headers (case-insensitive)
-        Object.keys(responseHeaders).forEach((headerKey) => {
-          if (headerKey.toLowerCase() === 'access-control-allow-origin') {
-            delete responseHeaders[headerKey]
-          }
-        })
         const requestInfo = requestMap.get(details.id)
         requestMap.delete(details.id)
+
+        // Remove existing headers (case-insensitive)
+        const deleteHeader = (/** @type {string} */ headerName) => {
+          Object.keys(responseHeaders).forEach((key) => {
+            if (key.toLowerCase() === headerName.toLowerCase()) {
+              delete responseHeaders[key]
+            }
+          })
+        }
+        deleteHeader('Access-Control-Allow-Origin')
+        deleteHeader('Access-Control-Allow-Methods')
+        deleteHeader('Access-Control-Allow-Headers')
+        deleteHeader('Access-Control-Expose-Headers')
+        deleteHeader('Vary')
+        deleteHeader('X-Frame-Options')
 
         const responseHeaderNames = Object.keys(responseHeaders).join(', ')
 
@@ -449,11 +458,6 @@ electron.app.whenReady().then(() => {
           responseHeaderNames,
         ]
         responseHeaders['Vary'] = ['Origin']
-        Object.keys(responseHeaders).forEach((headerKey) => {
-          if (headerKey.toLowerCase() === 'x-frame-options') {
-            delete responseHeaders[headerKey]
-          }
-        })
       }
       callback({ responseHeaders })
     }
