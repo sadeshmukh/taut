@@ -1,4 +1,4 @@
-import { TautPlugin, type TautPluginConfig } from '../core/Plugin'
+import { TautPlugin, type TautPluginConfig, type TautAPI } from '../core/Plugin'
 
 const NEKO_FILE =
   'https://raw.githubusercontent.com/adryd325/oneko.js/46b0684f29694eaf3252835003f4d9d0258556e5/oneko.gif'
@@ -89,7 +89,6 @@ export default class Oneko extends TautPlugin {
   nekoEl: HTMLDivElement | null = null
   animationFrameId: number | null = null
   lastFrameTimestamp: number | null = null
-  persistPosition = true
   config: OnekoConfig
 
   // State
@@ -107,9 +106,12 @@ export default class Oneko extends TautPlugin {
   boundHandleBeforeUnload: () => void
   boundOnAnimationFrame: (timestamp: number) => void
 
-  constructor(api: any, config: TautPluginConfig) {
+  constructor(api: TautAPI, config: TautPluginConfig) {
     super(api, config)
-    this.config = config as OnekoConfig
+    this.config = {
+      speed: 10,
+      ...config,
+    } as OnekoConfig
     this.boundHandleMouseMove = this.handleMouseMove.bind(this)
     this.boundHandleBeforeUnload = this.saveState.bind(this)
     this.boundOnAnimationFrame = this.onAnimationFrame.bind(this)
@@ -167,9 +169,7 @@ export default class Oneko extends TautPlugin {
 
   attachListeners(): void {
     document.addEventListener('mousemove', this.boundHandleMouseMove)
-    if (this.persistPosition) {
-      window.addEventListener('beforeunload', this.boundHandleBeforeUnload)
-    }
+    window.addEventListener('beforeunload', this.boundHandleBeforeUnload)
   }
 
   handleMouseMove(event: MouseEvent): void {
@@ -178,8 +178,6 @@ export default class Oneko extends TautPlugin {
   }
 
   loadState(): void {
-    if (!this.persistPosition) return
-
     try {
       const stored = window.localStorage.getItem('oneko')
       if (stored) {
@@ -205,7 +203,7 @@ export default class Oneko extends TautPlugin {
   }
 
   saveState(): void {
-    if (!this.persistPosition || !this.nekoEl) return
+    if (!this.nekoEl) return
 
     try {
       const state: OnekoState = {
@@ -221,7 +219,7 @@ export default class Oneko extends TautPlugin {
       }
       window.localStorage.setItem('oneko', JSON.stringify(state))
     } catch (e) {
-      // Ignore storage errors
+      this.log('Failed to save Oneko state', e)
     }
   }
 
@@ -235,7 +233,7 @@ export default class Oneko extends TautPlugin {
     }
 
     if (timestamp - this.lastFrameTimestamp > 100) {
-      this.lastFrameTimestamp = timestamp
+      this.lastFrameTimestamp += 100
       this.frame()
     }
 
