@@ -1,4 +1,4 @@
-// Marks users who aren't IDV verified as eligible in red
+// Shows a red squiggle on users who are not IDV verified
 // Author: Sahil (https://github.com/sahil)
 
 import { TautPlugin, type TautPluginConfig, type TautAPI } from '../core/Plugin'
@@ -63,16 +63,6 @@ export default class IdvStatus extends TautPlugin {
       }
     })
 
-    const processedAvatars = document.querySelectorAll(
-      '.taut-idv-avatar-not-eligible, .taut-idv-avatar-over-18'
-    )
-    processedAvatars.forEach((el) => {
-      el.classList.remove(
-        'taut-idv-avatar-not-eligible',
-        'taut-idv-avatar-over-18'
-      )
-    })
-
     // @ts-ignore
     delete window.tautIdvClearCache
   }
@@ -90,31 +80,13 @@ export default class IdvStatus extends TautPlugin {
     const css = `
       /* IDV plugin styles */
       .taut-idv-not-eligible {
-        color: #e01e5a !important;
         text-decoration: underline wavy #e01e5a !important;
-        text-decoration-thickness: 2px !important;
-      }
-
-      .taut-idv-not-eligible .c-avatar__image,
-      .taut-idv-not-eligible img,
-      .taut-idv-avatar-not-eligible img {
-        outline: 2px solid #e01e5a !important;
-        outline-offset: 2px !important;
-        border-radius: 50% !important;
-        box-shadow: 0 0 0 3px rgba(224,30,90,0.08) !important;
+        text-decoration-thickness: 1px !important;
       }
 
       .taut-idv-over-18 {
-        color: #d97706 !important;
-      }
-
-      .taut-idv-over-18 .c-avatar__image,
-      .taut-idv-over-18 img,
-      .taut-idv-avatar-over-18 img {
-        outline: 2px solid #d97706 !important;
-        outline-offset: 2px !important;
-        border-radius: 50% !important;
-        box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.08) !important;
+        text-decoration: underline wavy #d97706 !important;
+        text-decoration-thickness: 1px !important;
       }
     `
 
@@ -218,34 +190,12 @@ export default class IdvStatus extends TautPlugin {
 
     const status = await this.fetchIdvStatus(slackId)
 
-    let avatarImg: HTMLImageElement | null = null
-    try {
-      const gutterRight = btn.closest('.c-message_kit__gutter__right')
-      if (gutterRight && gutterRight.parentElement) {
-        // left gutter avatar
-        const avatarContainer = gutterRight.parentElement.querySelector(
-          '.c-message_kit__gutter__left .c-message_kit__avatar'
-        )
-        if (avatarContainer) {
-          avatarImg = avatarContainer.querySelector('img')
-        }
-      }
-    } catch (e) {
-      this.log('Error finding avatar:', e)
-    }
-
     if (status === 'unverified') {
       btn.classList.add('taut-idv-not-eligible')
       btn.title = 'IDV: Not Verified/Eligible'
-      if (avatarImg) {
-        avatarImg.parentElement?.classList.add('taut-idv-avatar-not-eligible')
-      }
     } else if (status === 'over_18') {
       btn.classList.add('taut-idv-over-18')
       btn.title = 'IDV: Verified (Over 18)'
-      if (avatarImg) {
-        avatarImg.parentElement?.classList.add('taut-idv-avatar-over-18')
-      }
     }
   }
 
