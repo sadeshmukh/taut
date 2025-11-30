@@ -82,7 +82,7 @@ async function readConfig() {
  */
 async function bundleAndSendPlugin(filePath) {
   const name = getPluginName(filePath)
-  const pluginConfig = config.plugins[name]
+  const pluginConfig = config.plugins[name] || { enabled: false }
 
   try {
     const iife = await bundle(filePath)
@@ -128,8 +128,8 @@ function watchConfig() {
     ])
 
     for (const name of allPluginNames) {
-      const oldPluginConfig = oldPluginConfigs[name]
-      const newPluginConfig = newPluginConfigs[name]
+      const oldPluginConfig = oldPluginConfigs[name] || { enabled: false }
+      const newPluginConfig = newPluginConfigs[name] || { enabled: false }
 
       if (!deepEqual(oldPluginConfig, newPluginConfig)) {
         console.log(`[Taut] Config changed for plugin: ${name}`)

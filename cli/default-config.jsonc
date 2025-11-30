@@ -3,11 +3,17 @@
   // Edit this file to configure your plugins
 
   "plugins": {
+    // Show a red squiggle on users who are not IDV verified
+    "IdvStatus": {
+      "enabled": false
+    },
+    // Show an indicator next to every user showing their Hackatime status (Hackatime admins only)
     "ShinigamiEyes": {
       "enabled": false,
       // https://hackatime.hackclub.com/admin/admin_api_keys
       "apiToken": ""
     },
+    // A little cat that chases your cursor around the screen
     "Oneko": {
       "enabled": false,
       "speed": 10
