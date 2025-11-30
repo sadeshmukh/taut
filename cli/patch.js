@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import { existsSync, constants, readdirSync } from 'node:fs'
 import path from 'node:path'
-import os from 'node:os'
+import os, { platform } from 'node:os'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { createPackage, extractFile } from '@electron/asar'
 import { fileURLToPath } from 'node:url'
@@ -21,7 +21,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
  * in a way that requires re-patching the Slack binary
  * @type {number}
  */
-export const PATCH_VERSION = 1
+export const PATCH_VERSION = 2
 
 /**
  * Extracts version information from an asar archive's package.json
@@ -227,6 +227,45 @@ export async function killSlack() {
 export async function isPatched(resourcesDir) {
   const backup = path.join(resourcesDir, '_app.asar')
   return existsSync(backup)
+}
+
+/**
+ * Checks if the Slack installation is from the Mac App Store
+ * @param {string} resourcesDir - The Slack resources directory path
+ * @returns {Promise<boolean>} True if the installation is from the Mac App Store
+ */
+export async function isMacAppStoreInstall(resourcesDir) {
+  if (process.platform !== 'darwin') return false
+  const masReceiptPath = path.join(resourcesDir, '..', '_MASReceipt', 'receipt')
+  try {
+    await fs.access(masReceiptPath, constants.F_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Checks if the Slack installation has MacOS app sandboxing enabled
+ * @param {string} resourcesDir - The Slack resources directory path
+ * @returns {Promise<boolean>} True if sandboxing is enabled
+ */
+export async function isMacSandboxed(resourcesDir) {
+  if (process.platform !== 'darwin') return false
+  // codesign -d --entitlements - /Applications/Slack.app
+  const appPath = path.resolve(resourcesDir, '..', '..')
+  try {
+    const result = execFileSync(
+      'codesign',
+      ['-d', '--entitlements', '-', appPath],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+    )
+    const sandboxRegex =
+      /\t\[Key] com\.apple\.security\.app-sandbox\n\t\[Value]\n\t\t\[Bool] true\n/
+    return sandboxRegex.test(result)
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -489,13 +528,23 @@ async function applyPatch(resourcesDir) {
  * @returns {Promise<void>}
  */
 async function checkPatchPreconditions(resourcesDir) {
-  if (isSlackRunning()) {
-    const killed = await killSlack()
-    // Double-check
-    if (!killed || isSlackRunning()) {
-      console.error('❌ Could not close Slack. Please close it manually.')
-      process.exit(1)
-    }
+  if (await isMacAppStoreInstall(resourcesDir)) {
+    console.error(
+      '❌ Mac App Store installation detected. Taut cannot be installed on MAS versions of Slack.'
+    )
+    console.error(
+      '   Please uninstall Slack, then reinstall it from https://slack.com/downloads/instructions/mac?ddl=1&build=mac'
+    )
+    process.exit(1)
+  }
+  if (await isMacSandboxed(resourcesDir)) {
+    console.error(
+      '❌ MacOS app sandboxing detected. Taut cannot be installed on sandboxed versions of Slack.'
+    )
+    console.error(
+      '   Please uninstall Slack, then reinstall it from https://slack.com/downloads/instructions/mac?ddl=1&build=mac'
+    )
+    process.exit(1)
   }
 
   if (!(await checkWriteAccess(resourcesDir))) {
@@ -516,6 +565,15 @@ async function checkPatchPreconditions(resourcesDir) {
       '❌ Detected broken Slack installation. Please reinstall Slack.'
     )
     process.exit(1)
+  }
+
+  if (isSlackRunning()) {
+    const killed = await killSlack()
+    // Double-check
+    if (!killed || isSlackRunning()) {
+      console.error('❌ Could not close Slack. Please close it manually.')
+      process.exit(1)
+    }
   }
 }
 
@@ -553,11 +611,23 @@ export async function install(resourcesDir) {
     console.log(`ℹ️  Patch v${PATCH_VERSION} is up to date.`)
   }
 
+  // Temporary, move old config dir to new location
+  if (process.platform === 'darwin') {
+    try {
+      await fs.rename(
+        path.join(os.homedir(), 'Library', 'Preferences', 'taut'),
+        configDir
+      )
+      console.log('ℹ️  Moved old config directory to new location.')
+    } catch {}
+  }
+
   console.log()
   await copyJsToConfigDir()
 
   console.log()
   console.log('✅ Taut installed successfully!')
+  console.log('   Config directory:', configDir)
 }
 
 /**
