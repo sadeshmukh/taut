@@ -488,7 +488,7 @@ async function applyPatch(resourcesDir) {
  * @param {string} resourcesDir - The Slack resources directory path
  * @returns {Promise<void>}
  */
-async function checkPreconditions(resourcesDir) {
+async function checkPatchPreconditions(resourcesDir) {
   if (isSlackRunning()) {
     const killed = await killSlack()
     // Double-check
@@ -527,8 +527,6 @@ async function checkPreconditions(resourcesDir) {
  * @returns {Promise<void>}
  */
 export async function install(resourcesDir) {
-  await checkPreconditions(resourcesDir)
-
   const appAsar = path.join(resourcesDir, 'app.asar')
   const asarInfo = await getAsarInfo(appAsar)
 
@@ -539,6 +537,8 @@ export async function install(resourcesDir) {
     asarInfo.patchVersion !== PATCH_VERSION
 
   if (needsPatch) {
+    await checkPatchPreconditions(resourcesDir)
+
     if (asarInfo?.name === 'taut-shim') {
       console.log(
         `ℹ️  Updating patch from v${
@@ -627,7 +627,7 @@ async function removePatch(resourcesDir) {
  * @returns {Promise<void>}
  */
 export async function uninstall(resourcesDir) {
-  await checkPreconditions(resourcesDir)
+  await checkPatchPreconditions(resourcesDir)
   await removePatch(resourcesDir)
   console.log('✅ Taut uninstalled successfully!')
 }

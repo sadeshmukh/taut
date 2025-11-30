@@ -168,9 +168,8 @@ export default class IdvStatus extends TautPlugin {
     if (this.idvCache[slackId]) return this.idvCache[slackId]
 
     try {
-      // TODO: Make a proper fetch api for cors bypassing without a 3rd party proxy
       const response = await fetch(
-        `https://corsproxy.io/?${IDV_API_URL}?slack_id=${slackId}`
+        `${IDV_API_URL}?slack_id=${slackId}`
       )
 
       if (!response.ok) {
