@@ -86,10 +86,11 @@ type OnekoConfig = TautPluginConfig & {
 }
 
 export default class Oneko extends TautPlugin {
+  config: OnekoConfig
+
   nekoEl: HTMLDivElement | null = null
   animationFrameId: number | null = null
   lastFrameTimestamp: number | null = null
-  config: OnekoConfig
 
   // State
   nekoPosX = 32

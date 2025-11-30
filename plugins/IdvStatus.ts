@@ -1,4 +1,4 @@
-import { TautPlugin, type TautPluginConfig } from '../core/Plugin'
+import { TautPlugin, type TautPluginConfig, type TautAPI } from '../core/Plugin'
 
 const IDV_API_URL = 'https://identity.hackclub.com/api/external/check'
 const IDV_CACHE_KEY = 'slack_idv_status_v2'
@@ -7,10 +7,10 @@ const IDV_CACHE_DURATION = 24 * 60 * 60 * 1000
 const MAX_CACHE_SIZE = 5000
 
 export default class IdvStatus extends TautPlugin {
-  private idvCache: Record<string, string> = {}
-  private stylesElement: HTMLStyleElement | null = null
-  private observer: MutationObserver | null = null
-  private mutationTimeout: ReturnType<typeof setTimeout> | null = null
+  idvCache: Record<string, string> = {}
+  stylesElement: HTMLStyleElement | null = null
+  observer: MutationObserver | null = null
+  mutationTimeout: ReturnType<typeof setTimeout> | null = null
 
   start(): void {
     this.log('Starting IDV Status...')
@@ -81,7 +81,7 @@ export default class IdvStatus extends TautPlugin {
     this.log('IDV Cache cleared')
   }
 
-  private injectStyles(): void {
+  injectStyles(): void {
     if (this.stylesElement) return
 
     const css = `
@@ -121,7 +121,7 @@ export default class IdvStatus extends TautPlugin {
     document.head.appendChild(this.stylesElement)
   }
 
-  private loadIdvCache(): void {
+  loadIdvCache(): void {
     try {
       const timestamp = localStorage.getItem(IDV_CACHE_TIMESTAMP_KEY)
       if (
@@ -143,7 +143,7 @@ export default class IdvStatus extends TautPlugin {
     }
   }
 
-  private saveIdvCache(): void {
+  saveIdvCache(): void {
     try {
       localStorage.setItem(IDV_CACHE_KEY, JSON.stringify(this.idvCache))
       localStorage.setItem(IDV_CACHE_TIMESTAMP_KEY, Date.now().toString())
@@ -152,7 +152,7 @@ export default class IdvStatus extends TautPlugin {
     }
   }
 
-  private setCache(slackId: string, status: string): void {
+  setCache(slackId: string, status: string): void {
     this.idvCache[slackId] = status
 
     const keys = Object.keys(this.idvCache)
@@ -164,7 +164,7 @@ export default class IdvStatus extends TautPlugin {
     this.saveIdvCache()
   }
 
-  private async fetchIdvStatus(slackId: string): Promise<string> {
+  async fetchIdvStatus(slackId: string): Promise<string> {
     if (this.idvCache[slackId]) return this.idvCache[slackId]
 
     try {
@@ -201,10 +201,7 @@ export default class IdvStatus extends TautPlugin {
     }
   }
 
-  private async renderIdv(
-    btn: HTMLButtonElement,
-    slackId: string
-  ): Promise<void> {
+  async renderIdv(btn: HTMLButtonElement, slackId: string): Promise<void> {
     // If we've already checked this button, verify the styling is still present
     // This handles cases where React re-renders and strips classes but keeps attributes
     if (btn.dataset.idvChecked === 'true') {
@@ -252,7 +249,7 @@ export default class IdvStatus extends TautPlugin {
     }
   }
 
-  private processIdvUsers(): void {
+  processIdvUsers(): void {
     // Select ALL sender buttons, not just unchecked ones
     // This allows us to catch elements where React stripped the class
     // Updates are weird - it triggers re-renders when you wouldn't expect
