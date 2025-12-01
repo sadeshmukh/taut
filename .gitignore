@@ -2,4 +2,4 @@ node_modules/
 .DS_Store
 repomix-output.*
 tmp*
-core/deps/
+core/main/deps/

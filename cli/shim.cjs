@@ -27,7 +27,7 @@ function osConfigDir() {
 const configDir = path.join(osConfigDir(), 'taut')
 
 // Load the Taut main process script
-const mainJs = path.join(configDir, 'core', 'main.cjs')
+const mainJs = path.join(configDir, 'core', 'main', 'main.cjs')
 require(mainJs)
 
 // Load the original Slack app

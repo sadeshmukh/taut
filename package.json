@@ -20,7 +20,7 @@
     "taut": "./cli/cli.js"
   },
   "scripts": {
-    "build": "bun build ./core/deps.ts --target node --format cjs --keep-names --outfile ./core/deps/deps.bundle.js && cp ./node_modules/esbuild-wasm/esbuild.wasm ./core/deps/esbuild.wasm",
+    "build": "bun build ./core/main/deps.ts --target node --format cjs --keep-names --outfile ./core/main/deps/deps.bundle.js && cp ./node_modules/esbuild-wasm/esbuild.wasm ./core/main/deps/esbuild.wasm",
     "format": "prettier --write .",
     "taut-cli": "bun ./cli/cli.js"
   },

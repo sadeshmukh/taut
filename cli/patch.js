@@ -21,7 +21,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
  * in a way that requires re-patching the Slack binary
  * @type {number}
  */
-export const PATCH_VERSION = 2
+export const PATCH_VERSION = 3
 
 /**
  * Extracts version information from an asar archive's package.json

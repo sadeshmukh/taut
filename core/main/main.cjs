@@ -9,18 +9,19 @@ const electron = require('electron')
 
 // @ts-ignore
 globalThis.self = globalThis
-/** @type {typeof import('./deps.ts')} */
+/** @type {typeof import('./deps.js')} */
 const deps = require('./deps/deps.bundle.js')
 const { initEsbuild, bundle, stopEsbuild, parseJSONC } = deps
 
 // Path to the taut directory (where this file lives when installed)
-const TAUT_DIR = path.join(__dirname, '..')
+const TAUT_DIR = path.join(__dirname, '..', '..')
 const PLUGINS_DIR = path.join(TAUT_DIR, 'plugins')
 const USER_PLUGINS_DIR = path.join(TAUT_DIR, 'user-plugins')
 const CONFIG_PATH = path.join(TAUT_DIR, 'config.jsonc')
 const USER_CSS_PATH = path.join(TAUT_DIR, 'user.css')
-const WASM_PATH = path.join(TAUT_DIR, 'core', 'deps', 'esbuild.wasm')
-const CLIENT_JS_PATH = path.join(TAUT_DIR, 'core', 'client.js')
+const ESBUILD_WASM_PATH = path.join(TAUT_DIR, 'core', 'main', 'deps', 'esbuild.wasm')
+const PRELOAD_JS_PATH = path.join(TAUT_DIR, 'core', 'preload', 'preload.cjs')
+const CLIENT_JS_PATH = path.join(TAUT_DIR, 'core', 'renderer', 'client.js')
 
 /** @type {boolean} */
 let esbuildInitialized = false
@@ -205,7 +206,7 @@ async function watchPluginDir(dir) {
       }
 
       if (!esbuildInitialized) {
-        await initEsbuild(WASM_PATH)
+        await initEsbuild(ESBUILD_WASM_PATH)
         esbuildInitialized = true
       }
 
@@ -256,7 +257,7 @@ electron.ipcMain.handle('taut:start-plugins', async () => {
   try {
     // Initialize esbuild if not already done
     if (!esbuildInitialized) {
-      await initEsbuild(WASM_PATH)
+      await initEsbuild(ESBUILD_WASM_PATH)
       esbuildInitialized = true
     }
 
@@ -352,7 +353,7 @@ redirected.set(
     }
 
     // Use our custom preload
-    options.webPreferences.preload = require.resolve('./preload.cjs')
+    options.webPreferences.preload = PRELOAD_JS_PATH
 
     BROWSER = Reflect.construct(target, [options], newTarget)
     if (!BROWSER) {

@@ -22,5 +22,5 @@
     "skipLibCheck": true
   },
   "include": ["**/*.ts", "**/*.js", "**/*.cjs"],
-  "exclude": ["node_modules", "core/deps/"]
+  "exclude": ["node_modules", "core/main/deps/"]
 }

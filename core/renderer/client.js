@@ -5,9 +5,7 @@
 ;(function () {
   'use strict'
 
-  /** @import { TautAPI } from './preload.cjs' */
-  /** @import { TautPlugin, TautPluginConstructor } from './Plugin' */
-  /** @import { TautPluginConfig } from './main.cjs' */
+  /** @import { TautAPI, TautPlugin, TautPluginConstructor, TautPluginConfig } from '../Plugin' */
 
   /**
    * Plugin Manager - loads and manages Taut plugins

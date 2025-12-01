@@ -3,7 +3,7 @@
 // Exposes TautAPI to the renderer and loads the original Slack preload
 
 const { contextBridge, ipcRenderer } = require('electron')
-/** @import { TautPluginConfig } from './main.cjs' */
+/** @import { TautPluginConfig } from '../Plugin' */
 
 console.log('[Taut] Preload loaded')
 
