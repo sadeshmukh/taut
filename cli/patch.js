@@ -87,8 +87,6 @@ export async function getBinaryFuses(binaryPath) {
  * @returns {string[]} Array of potential resource directory paths
  */
 function getWindowsSlackPaths() {
-  // Prefer Program Files WindowsApps install location which looks like:
-  // C:\Program Files\WindowsApps\com.tinyspeck.slackdesktop_4.47.65.0_arm64__8yrtsj140pw4g\app\resources
   const programFiles =
     process.env['ProgramFiles'] || process.env['ProgramW6432']
   if (!programFiles) return []
