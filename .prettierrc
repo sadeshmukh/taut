@@ -4,6 +4,7 @@
   "semi": false,
   "singleQuote": true,
   "quoteProps": "consistent",
+  "proseWrap": "always",
   "overrides": [
     {
       "files": "*.jsonc",
