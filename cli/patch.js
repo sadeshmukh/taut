@@ -86,21 +86,24 @@ export async function getBinaryFuses(binaryPath) {
  * @returns {string[]} Array of potential resource directory paths
  */
 function getWindowsSlackPaths() {
-  const localAppData = process.env.LOCALAPPDATA
-  if (!localAppData) return []
-  const slackBase = path.join(localAppData, 'slack')
-  // Windows Slack uses app-X.X.X folders like Discord
+  // Prefer Program Files WindowsApps install location which looks like:
+  // C:\Program Files\WindowsApps\com.tinyspeck.slackdesktop_4.47.65.0_arm64__8yrtsj140pw4g\app\resources
+  const programFiles = process.env['ProgramFiles'] || process.env['ProgramW6432']
+  if (!programFiles) return []
+  const windowsApps = path.join(programFiles, 'WindowsApps')
   try {
-    if (!existsSync(slackBase)) return []
-    const entries = readdirSync(slackBase)
-    const appDirs = entries
-      .filter((e) => e.startsWith('app-'))
+    if (!existsSync(windowsApps)) return []
+    const entries = readdirSync(windowsApps)
+    const slackPkgs = entries
+      .filter((e) => e.startsWith('com.tinyspeck.slackdesktop_'))
       .sort()
       .reverse()
-    if (appDirs.length > 0) {
-      return [path.join(slackBase, appDirs[0], 'resources')]
+
+    if (slackPkgs.length > 0) {
+      return slackPkgs.map((pkg) => path.join(windowsApps, pkg, 'app', 'resources'))
     }
   } catch {}
+
   return []
 }
 
