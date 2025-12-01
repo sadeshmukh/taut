@@ -10,7 +10,7 @@
   "scripts": {
     "build": "bun build ./core/deps.ts --target node --format cjs --keep-names --outfile ./core/deps/deps.bundle.js && cp ./node_modules/esbuild-wasm/esbuild.wasm ./core/deps/esbuild.wasm",
     "format": "prettier --write .",
-    "taut-cli": "./cli/cli.js"
+    "taut-cli": "bun ./cli/cli.js"
   },
   "keywords": [
     "taut",
