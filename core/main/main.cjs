@@ -13,7 +13,7 @@ const electron = require('electron')
 globalThis.self = globalThis
 /** @type {typeof import('./deps.js')} */
 const deps = require('./deps/deps.bundle.js')
-const { initEsbuild, bundle, stopEsbuild, parseJSONC } = deps
+const { initEsbuild, bundle, parseJSONC, installReactDevtools } = deps
 
 // Path to the taut directory (where this file lives when installed)
 const TAUT_DIR = path.join(__dirname, '..', '..')
@@ -452,9 +452,12 @@ Module._load = function (request, parent, isMain) {
   return originalExports
 }
 
-// Allow all CORS requests by setting ACAO header to https://app.slack.com
-// Doesn't modifiy requests from iframes for security but also to not break them
-electron.app.whenReady().then(() => {
+const whenReadyPromise = electron.app.whenReady()
+const fakeWhenReadyPromise = (async () => {
+  await whenReadyPromise
+
+  // Allow all CORS requests by setting ACAO header to https://app.slack.com
+  // Doesn't modifiy requests from iframes for security but also to not break them
   /**
    * Stores the origin for each request ID
    * @type {Map<number, {origin: string | null, requestedMethod: string | null, requestedHeaders: string | null}>}
@@ -536,7 +539,31 @@ electron.app.whenReady().then(() => {
       callback({ responseHeaders })
     }
   )
-})
+
+  // Install React DevTools
+  try {
+    console.log('[Taut] Installing React Developer Tools...')
+    await installReactDevtools()
+    console.log('[Taut] React Developer Tools installed')
+    const extensions =
+      electron.session.defaultSession.extensions.getAllExtensions()
+    console.log(
+      `[Taut] Installed extensions: ${extensions.map((ext) => `${ext.name} (${ext.version})`).join(', ')}`
+    )
+    // https://github.com/electron/electron/issues/41613#issuecomment-2644018998
+    for (const extension of extensions) {
+      if (extension.manifest?.manifest_version === 3 && extension.manifest?.background?.service_worker) {
+        await electron.session.defaultSession.serviceWorkers.startWorkerForScope(extension.url)
+      }
+    }
+  } catch (err) {
+    console.error('[Taut] Failed to install React Developer Tools:', err)
+  }
+})()
+electron.app.whenReady = async () => {
+  console.log('[Taut] app.whenReady() called')
+  await fakeWhenReadyPromise
+}
 
 // Custom application menu with Taut options
 electron.Menu.setApplicationMenu(

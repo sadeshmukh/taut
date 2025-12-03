@@ -5,6 +5,7 @@ import * as jsonc from 'jsonc-parser/lib/esm/main.js'
 import resolve from 'resolve'
 import path from 'node:path'
 import fs from 'node:fs'
+import { installExtension, REACT_DEVELOPER_TOOLS } from 'electron-devtools-installer'
 
 const defaultLoader: Record<string, esbuild.Loader | undefined> = {
   '.ts': 'ts',
@@ -120,4 +121,10 @@ export function parseJSONC(text: string): any {
   return jsonc.parse(text, undefined, {
     allowTrailingComma: true,
   })
+}
+
+// In the future, we could consider including the extension
+// in the installer so it doesn't install on first run
+export async function installReactDevtools() {
+  await installExtension(REACT_DEVELOPER_TOOLS)
 }
