@@ -47,7 +47,9 @@ export async function askYesNo(question) {
   return new Promise((resolve) => {
     rl.question(`${question} [Y/n]: `, (answer) => {
       rl.close()
-      resolve(answer.trim().toLowerCase() !== 'n')
+      resolve(
+        answer === '' || ['y', 'yes'].includes(answer.trim().toLowerCase())
+      )
     })
   })
 }

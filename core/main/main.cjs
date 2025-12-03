@@ -2,9 +2,11 @@
 // Wraps Electron modules to inject custom behavior into Slack
 // Loaded by the app.asar shim patched into Slack
 
-const Module = require('module')
+console.log('[Taut] Starting Taut')
+
 const { promises: fs, watchFile, watch, readFileSync } = require('fs')
 const path = require('path')
+const Module = require('module')
 const electron = require('electron')
 
 // @ts-ignore
@@ -29,11 +31,19 @@ const ESBUILD_WASM_PATH = path.join(
 const PRELOAD_JS_PATH = path.join(TAUT_DIR, 'core', 'preload', 'preload.js')
 const CLIENT_JS_PATH = path.join(TAUT_DIR, 'core', 'renderer', 'client.js')
 
-/** @type {boolean} */
-let esbuildInitialized = false
+const esbuildInitialized = initEsbuild(ESBUILD_WASM_PATH)
 
 /** Supported plugin file extensions */
-const PLUGIN_EXTENSIONS = ['.js', '.cjs', '.mjs', '.ts', '.cts', '.mts']
+const PLUGIN_EXTENSIONS = [
+  '.js',
+  '.cjs',
+  '.mjs',
+  '.jsx',
+  '.ts',
+  '.cts',
+  '.mts',
+  '.tsx',
+]
 
 /**
  * Cache for the original Slack preload script contents
@@ -92,6 +102,7 @@ async function bundleAndSendPlugin(filePath) {
   const pluginConfig = config.plugins[name] || { enabled: false }
 
   try {
+    await esbuildInitialized
     const iife = await bundle(filePath)
 
     const code = `globalThis.__tautPluginManager.loadPlugin(${JSON.stringify(
@@ -205,18 +216,7 @@ async function watchPluginDir(dir) {
       const filePath = path.join(dir, filename)
       console.log(`[Taut] Plugin file ${eventType}: ${filename}`)
 
-      // Check if file exists (it might have been deleted)
-      if (!(await fileExists(filePath))) {
-        console.log(`[Taut] Plugin file deleted: ${filename}`)
-        return
-      }
-
-      if (!esbuildInitialized) {
-        await initEsbuild(ESBUILD_WASM_PATH)
-        esbuildInitialized = true
-      }
-
-      await bundleAndSendPlugin(filePath)
+      await handlePluginFileChange(filePath)
     })
   } catch (err) {
     console.error(`[Taut] Failed to watch plugin dir ${dir}:`, err)
@@ -224,27 +224,97 @@ async function watchPluginDir(dir) {
 }
 
 /**
- * Scan a directory for plugin files
- * @param {string} dir
- * @returns {Promise<string[]>} Array of absolute paths to plugin files
+ * Scan directories and generate a map of active plugins
+ * Prioritizes user plugins over core plugins
+ * Prioritizes extensions based on PLUGIN_EXTENSIONS order
+ * @returns {Promise<Map<string, string>>} Map of plugin name -> absolute file path
  */
-async function scanPluginDir(dir) {
-  /** @type {string[]} */
-  const plugins = []
-  try {
-    if (!(await fileExists(dir))) return plugins
+async function getPluginMap() {
+  const pluginMap = new Map()
+
+  // Helper to process a directory
+  /**
+   * @param {string} dir
+   */
+  const processDir = async (dir) => {
+    if (!(await fileExists(dir))) return
+
     const files = await fs.readdir(dir)
+    const pluginsInDir = new Map() // name -> { extIndex, path }
+
     for (const file of files) {
       const ext = path.extname(file)
-      if (PLUGIN_EXTENSIONS.includes(ext)) {
-        plugins.push(path.join(dir, file))
+      const extIndex = PLUGIN_EXTENSIONS.indexOf(ext)
+      if (extIndex === -1) continue
+
+      const name = path.basename(file, ext)
+      const filePath = path.resolve(dir, file)
+
+      // If we haven't seen this plugin in this dir yet, or if this file has higher priority extension
+      // (lower index) than what we've seen, store it
+      if (
+        !pluginsInDir.has(name) ||
+        pluginsInDir.get(name).extIndex > extIndex
+      ) {
+        pluginsInDir.set(name, { extIndex, path: filePath })
       }
     }
-  } catch (err) {
-    console.error(`[Taut] Failed to scan plugin dir ${dir}:`, err)
+
+    // Add to main map
+    for (const [name, info] of pluginsInDir) {
+      pluginMap.set(name, info.path)
+    }
   }
-  return plugins
+
+  // Process core first, then user (so user overrides)
+  await processDir(PLUGINS_DIR)
+  await processDir(USER_PLUGINS_DIR)
+
+  return pluginMap
 }
+
+/**
+ * Handle file changes in plugin directories
+ * @param {string} changedFilePath - Absolute path to the changed file
+ */
+async function handlePluginFileChange(changedFilePath) {
+  const oldPluginMap = currentPluginMap
+  const newPluginMap = await getPluginMap()
+  currentPluginMap = newPluginMap
+
+  /** @type {Set<string>} */
+  const pluginsToLoad = new Set()
+
+  // If the changed file is the active version, load it
+  const changedName = getPluginName(changedFilePath)
+  const activePath = newPluginMap.get(changedName)
+  if (activePath === changedFilePath) {
+    pluginsToLoad.add(activePath)
+  } else {
+    console.log(
+      `[Taut] Changed file ${changedFilePath} is not the active version for plugin ${changedName}, skipping load`
+    )
+  }
+
+  // Any other differences
+  for (const [name, newPath] of newPluginMap) {
+    const oldPath = oldPluginMap.get(name)
+    if (oldPath !== newPath) {
+      pluginsToLoad.add(newPath)
+      console.log(
+        `[Taut] Plugin resolution changed for ${name}: ${oldPath} -> ${newPath}`
+      )
+    }
+  }
+
+  // Bundle and send all affected plugins
+  for (const filePath of pluginsToLoad) {
+    await bundleAndSendPlugin(filePath)
+  }
+}
+
+/** @type {Map<string, string>} */
+let currentPluginMap = new Map()
 
 /**
  * Get plugin name from file path
@@ -261,21 +331,13 @@ function getPluginName(filePath) {
 electron.ipcMain.handle('taut:start-plugins', async () => {
   console.log('[Taut] Starting plugins')
   try {
-    // Initialize esbuild if not already done
-    if (!esbuildInitialized) {
-      await initEsbuild(ESBUILD_WASM_PATH)
-      esbuildInitialized = true
-    }
-
     // Read and store config
     config = await readConfig()
 
-    // Scan both plugin directories
-    const [corePlugins, userPlugins] = await Promise.all([
-      scanPluginDir(PLUGINS_DIR),
-      scanPluginDir(USER_PLUGINS_DIR),
-    ])
-    const pluginFiles = [...corePlugins, ...userPlugins]
+    // Generate initial plugin map
+    currentPluginMap = await getPluginMap()
+    const pluginFiles = [...currentPluginMap.values()]
+
     console.log(
       `[Taut] Found ${pluginFiles.length} plugin files:`,
       pluginFiles,
@@ -314,13 +376,13 @@ electron.ipcMain.handle('taut:get-original-preload', () => {
  */
 let BROWSER
 
-const OriginalBrowserWindow = electron.BrowserWindow
-// @ts-ignore
-class TautBrowserWindow extends OriginalBrowserWindow {
+const proxiedBrowserWindow = new Proxy(electron.BrowserWindow, {
   /**
-   * @param {Electron.BrowserWindowConstructorOptions} options
+   * @param {typeof electron.BrowserWindow} target
+   * @param {[Electron.BrowserWindowConstructorOptions]} arguments
+   * @returns {electron.BrowserWindow}
    */
-  constructor(options) {
+  construct(target, [ options ]) {
     console.log('[Taut] Constructing BrowserWindow')
     if (!options.webPreferences) {
       options.webPreferences = {}
@@ -343,16 +405,16 @@ class TautBrowserWindow extends OriginalBrowserWindow {
     // Use our custom preload
     options.webPreferences.preload = PRELOAD_JS_PATH
 
-    super(options)
-    BROWSER = this
+    const instance = new target(options)
+    BROWSER = instance
 
     // Inject client.js on page load
-    this.webContents.on('did-finish-load', async () => {
+    instance.webContents.on('did-finish-load', async () => {
       try {
         if (await fileExists(CLIENT_JS_PATH)) {
           const clientJs = await fs.readFile(CLIENT_JS_PATH, 'utf8')
           console.log('[Taut] Injecting client.js')
-          await this.webContents.executeJavaScript(clientJs)
+          await instance.webContents.executeJavaScript(clientJs)
         } else {
           console.error('[Taut] client.js not found at:', CLIENT_JS_PATH)
         }
@@ -360,10 +422,35 @@ class TautBrowserWindow extends OriginalBrowserWindow {
         console.error('[Taut] Failed to inject client.js:', err)
       }
     })
-  }
-}
 
-electron.BrowserWindow = TautBrowserWindow
+    return instance
+  },
+})
+
+/** @typedef {(request: string, parent: Module, isMain: boolean) => object} ModuleLoadFunction */
+/** @type {ModuleLoadFunction} */
+// @ts-ignore
+const originalLoad = Module._load
+/** @type {ModuleLoadFunction} */
+// @ts-ignore
+Module._load = function(request, parent, isMain) {
+  // only intercept 'electron'
+  const originalExports = originalLoad.apply(this, [request, parent, isMain])
+  if (request === 'electron') {
+    console.log('[Taut] electron module loaded, wrapping in a Proxy')
+    const newExports = new Proxy(originalExports, {
+      get(target, prop, receiver) {
+        if (prop === 'BrowserWindow') {
+          console.log('[Taut] Returning proxied BrowserWindow')
+          return proxiedBrowserWindow
+        }
+        return Reflect.get(target, prop, receiver)
+      },
+    })
+    return newExports
+  }
+  return originalExports
+}
 
 // Allow all CORS requests by setting ACAO header to https://app.slack.com
 // Doesn't modifiy requests from iframes for security but also to not break them
@@ -544,5 +631,3 @@ function deepEqual(left, right) {
   }
   return Object.keys(right).length === keyCount
 }
-
-
