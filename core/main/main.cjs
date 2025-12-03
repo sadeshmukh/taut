@@ -382,7 +382,7 @@ const proxiedBrowserWindow = new Proxy(electron.BrowserWindow, {
    * @param {[Electron.BrowserWindowConstructorOptions]} arguments
    * @returns {electron.BrowserWindow}
    */
-  construct(target, [ options ]) {
+  construct(target, [options]) {
     console.log('[Taut] Constructing BrowserWindow')
     if (!options.webPreferences) {
       options.webPreferences = {}
@@ -433,7 +433,7 @@ const proxiedBrowserWindow = new Proxy(electron.BrowserWindow, {
 const originalLoad = Module._load
 /** @type {ModuleLoadFunction} */
 // @ts-ignore
-Module._load = function(request, parent, isMain) {
+Module._load = function (request, parent, isMain) {
   // only intercept 'electron'
   const originalExports = originalLoad.apply(this, [request, parent, isMain])
   if (request === 'electron') {

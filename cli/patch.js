@@ -5,11 +5,7 @@ import os from 'node:os'
 import { spawnSync } from 'node:child_process'
 import { createPackage } from '@electron/asar'
 import { fileURLToPath } from 'node:url'
-import {
-  flipFuses,
-  FuseVersion,
-  FuseV1Options,
-} from '@electron/fuses'
+import { flipFuses, FuseVersion, FuseV1Options } from '@electron/fuses'
 import {
   configDir,
   askYesNo,
@@ -151,7 +147,7 @@ async function resign(resourcesDir) {
   }
   const appPath = path.resolve(resourcesDir, '..', '..')
   console.log('🔏 Resigning Slack app...')
-  
+
   const codesign = spawnSync(
     'codesign',
     [
@@ -169,7 +165,9 @@ async function resign(resourcesDir) {
     if (codesign.stderr) console.error(codesign.stderr)
     console.error(
       `❌ codesign failed${
-        codesign.error ? `: ${codesign.error.message}` : ` with exit code ${codesign.status}`
+        codesign.error
+          ? `: ${codesign.error.message}`
+          : ` with exit code ${codesign.status}`
       }`
     )
   }
@@ -186,22 +184,24 @@ async function resign(resourcesDir) {
     }
     // If the message was that the attribute doesn't exist, that's normal
   }
-  
+
   // Reset macOS privacy permissions for Slack, as any current permissions
   // are now invalid, which can lead to confusion
   const permissions = ['ScreenCapture', 'Microphone', 'Camera']
   for (const permission of permissions) {
-    const tccutil = spawnSync('tccutil', [
-      'reset',
-      permission,
-      'com.tinyspeck.slackmacgap',
-    ], { encoding: 'utf8' })
+    const tccutil = spawnSync(
+      'tccutil',
+      ['reset', permission, 'com.tinyspeck.slackmacgap'],
+      { encoding: 'utf8' }
+    )
 
     if (tccutil.error || tccutil.status !== 0) {
       if (tccutil.stderr) console.error(tccutil.stderr)
       console.error(
         `❌ tccutil reset ${permission} failed${
-          tccutil.error ? `: ${tccutil.error.message}` : ` with exit code ${tccutil.status}`
+          tccutil.error
+            ? `: ${tccutil.error.message}`
+            : ` with exit code ${tccutil.status}`
         }`
       )
     }

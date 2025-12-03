@@ -108,7 +108,9 @@ async function main() {
     } else if (appAsarInfo && appAsarInfo.name === 'slack-desktop') {
       console.log(`app.asar: ✅ Slack v${appAsarInfo.version} (not patched)`)
     } else if (existsSync(appAsar)) {
-      console.log(`app.asar: ❌ Unknown app ${appAsarInfo?.name || '<no name>'}`)
+      console.log(
+        `app.asar: ❌ Unknown app ${appAsarInfo?.name || '<no name>'}`
+      )
       if (appAsarInfo?.version)
         console.log(`             version ${appAsarInfo.version}`)
     } else {
