@@ -151,7 +151,8 @@ async function resign(resourcesDir) {
   }
   const appPath = path.resolve(resourcesDir, '..', '..')
   console.log('🔏 Resigning Slack app...')
-  const cs = spawnSync(
+  
+  const codesign = spawnSync(
     'codesign',
     [
       '--force',
@@ -164,27 +165,48 @@ async function resign(resourcesDir) {
     { encoding: 'utf8' }
   )
 
-  if (cs.error || cs.status !== 0) {
-    if (cs.stderr) console.error(cs.stderr)
+  if (codesign.error || codesign.status !== 0) {
+    if (codesign.stderr) console.error(codesign.stderr)
     console.error(
       `❌ codesign failed${
-        cs.error ? `: ${cs.error.message}` : ` with exit code ${cs.status}`
+        codesign.error ? `: ${codesign.error.message}` : ` with exit code ${codesign.status}`
       }`
     )
   }
 
-  const xa = spawnSync('xattr', ['-d', 'com.apple.quarantine', appPath], {
+  const xattr = spawnSync('xattr', ['-d', 'com.apple.quarantine', appPath], {
     encoding: 'utf8',
   })
 
-  if (xa.error || xa.status !== 0) {
-    const stderr = xa.stderr || ''
+  if (xattr.error || xattr.status !== 0) {
+    const stderr = xattr.stderr || ''
     if (!stderr.includes('No such xattr: com.apple.quarantine')) {
       if (stderr) console.error(stderr)
       console.error('❌ xattr failed')
     }
     // If the message was that the attribute doesn't exist, that's normal
   }
+  
+  // Reset macOS privacy permissions for Slack, as any current permissions
+  // are now invalid, which can lead to confusion
+  const permissions = ['ScreenCapture', 'Microphone', 'Camera']
+  for (const permission of permissions) {
+    const tccutil = spawnSync('tccutil', [
+      'reset',
+      permission,
+      'com.tinyspeck.slackmacgap',
+    ], { encoding: 'utf8' })
+
+    if (tccutil.error || tccutil.status !== 0) {
+      if (tccutil.stderr) console.error(tccutil.stderr)
+      console.error(
+        `❌ tccutil reset ${permission} failed${
+          tccutil.error ? `: ${tccutil.error.message}` : ` with exit code ${tccutil.status}`
+        }`
+      )
+    }
+  }
+
   console.log('✅ Resign complete.')
 }
 
