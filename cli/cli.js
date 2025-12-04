@@ -10,7 +10,7 @@ import {
   getAsarInfo,
   askYesNo,
 } from './helpers.js'
-import { existsSync } from 'node:fs'
+import { exists, existsSync } from 'node:fs'
 
 /**
  * Main entry point for the Taut CLI installer
@@ -93,53 +93,50 @@ async function main() {
   } else if (action === 'status') {
     // Check asar files and their versions
 
+    /**
+     * @param {string} label 
+     * @param {string} asarPath 
+     */
+    const printAppAsarInfo = async (label, asarPath) => {
+      if (!existsSync(asarPath)) {
+        console.log(`${label}: Not present`)
+        return
+      }
+      const asarInfo = await getAsarInfo(asarPath)
+    
+      if (asarInfo && asarInfo.name === 'taut-shim') {
+        const isUpToDate = asarInfo.patchVersion === PATCH_VERSION
+        const statusText = isUpToDate ? 'up to date' : 'outdated'
+        console.log(
+          `${label}: Taut shim v${
+            asarInfo.patchVersion ?? '?'
+          } (${statusText})`
+        )
+        return
+      }
+      if (existsSync(path.join(resourcesDir, 'inject.js'))) {
+        // This app.asar likely has Snail injected
+        // https://github.com/espcaa/snail/blob/main/app/logic/install.go#L87
+        console.log(`${label}: Snail + Slack v${asarInfo?.version || '<unknown>'}`)
+        console.log(`${label}  https://github.com/espcaa/snail`)
+        console.log(`${label}  (Taut may be compatible with Snail, but this configuration is not officially supported)`)
+        return
+      }
+      if (asarInfo && asarInfo.name === 'slack-desktop') {
+        console.log(`${label}: Slack v${asarInfo.version}`)
+        return
+      }
+      console.log(
+        `${label}: Unknown app ${asarInfo?.name || '<no name>'}`
+      )
+      if (asarInfo?.version)
+        console.log(`${label}  version ${asarInfo.version}`) 
+    }
+
     const appAsar = path.join(resourcesDir, 'app.asar')
-    const appAsarInfo = await getAsarInfo(appAsar)
-
-    // app.asar line
-    if (appAsarInfo && appAsarInfo.name === 'taut-shim') {
-      const isUpToDate = appAsarInfo.patchVersion === PATCH_VERSION
-      const statusText = isUpToDate ? 'up to date' : 'outdated'
-      console.log(
-        `app.asar: ✅ Taut shim v${
-          appAsarInfo.patchVersion ?? '?'
-        } (${statusText})`
-      )
-    } else if (appAsarInfo && appAsarInfo.name === 'slack-desktop') {
-      console.log(`app.asar: ✅ Slack v${appAsarInfo.version} (not patched)`)
-    } else if (existsSync(appAsar)) {
-      console.log(
-        `app.asar: ❌ Unknown app ${appAsarInfo?.name || '<no name>'}`
-      )
-      if (appAsarInfo?.version)
-        console.log(`             version ${appAsarInfo.version}`)
-    } else {
-      console.log(`app.asar: ❌ Unknown or missing`)
-    }
-
+    printAppAsarInfo('app.asar', appAsar)
     const backupAsar = path.join(resourcesDir, '_app.asar')
-    const backupAsarInfo = await getAsarInfo(backupAsar)
-
-    // _app.asar line
-    if (backupAsarInfo && backupAsarInfo.name === 'taut-shim') {
-      console.log(
-        `_app.asar: ⚠️  Taut shim v${
-          backupAsarInfo.patchVersion ?? '?'
-        } (broken? this should be Slack!)`
-      )
-    } else if (backupAsarInfo && backupAsarInfo.name === 'slack-desktop') {
-      console.log(`_app.asar: ✅ Slack v${backupAsarInfo.version}`)
-    } else if (appAsarInfo && appAsarInfo.name === 'taut-shim') {
-      console.log(`_app.asar: ❌ Missing (broken state!)`)
-    } else if (existsSync(backupAsar)) {
-      console.log(
-        `_app.asar: ❌ Unknown app ${backupAsarInfo?.name || '<no name>'}`
-      )
-      if (backupAsarInfo?.version)
-        console.log(`             version ${backupAsarInfo.version}`)
-    } else {
-      console.log(`_app.asar: ➖ Not present (not patched)`)
-    }
+    printAppAsarInfo('_app.asar', backupAsar)
 
     const fuses = await getBinaryFuses(getElectronBinary(resourcesDir))
     const enabledFuses = Object.entries(fuses ?? {})
