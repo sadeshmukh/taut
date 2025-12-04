@@ -4,6 +4,10 @@
 const { promises: fs } = require('fs')
 const path = require('path')
 
+/** @type {typeof import('./deps.js')} */
+const deps = require('./deps/deps.bundle.js')
+const { initEsbuild } = deps
+
 /**
  * Deep equality for JSON-serializable values
  * @param {unknown} left - first value to compare
@@ -62,11 +66,14 @@ const PATHS = {
   userCss: path.join(TAUT_DIR, 'user.css'),
   esbuildWasm: path.join(TAUT_DIR, 'core', 'main', 'deps', 'esbuild.wasm'),
   preloadJs: path.join(TAUT_DIR, 'core', 'preload', 'preload.js'),
-  clientJs: path.join(TAUT_DIR, 'core', 'renderer', 'client.js'),
+  clientJs: path.join(TAUT_DIR, 'core', 'renderer', 'client.ts'),
 }
+
+const esbuildInitialized = initEsbuild(PATHS.esbuildWasm)
 
 module.exports = {
   deepEqual,
   fileExists,
   PATHS,
+  esbuildInitialized,
 }

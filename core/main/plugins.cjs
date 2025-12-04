@@ -6,15 +6,13 @@ const { promises: fs, watchFile, watch } = require('fs')
 const path = require('path')
 const electron = require('electron')
 
-const { PATHS, deepEqual, fileExists } = require('./helpers.cjs')
+const { PATHS, deepEqual, fileExists, esbuildInitialized } = require('./helpers.cjs')
 
 /** @type {typeof import('./deps.js')} */
 const deps = require('./deps/deps.bundle.js')
-const { initEsbuild, bundle, parseJSONC } = deps
+const { bundle, parseJSONC } = deps
 
 const { BROWSER } = require('./patch.cjs')
-
-const esbuildInitialized = initEsbuild(PATHS.esbuildWasm)
 
 /** Supported plugin file extensions */
 const PLUGIN_EXTENSIONS = [

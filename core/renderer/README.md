@@ -9,8 +9,8 @@ world alongside the Slack frontend. Responsible for:
   - Instantiating and initializing plugins
   - Loading, reloading, and unloading plugins as the config changes
 
-Environment: Electron renderer process main world (Chromium, alongside Slack
-frontend), browser
+Environment: Bundled by esbuild, Electron renderer process main world (Chromium,
+alongside Slack frontend), ESM
 
-- `core/renderer/client.js`: Entrypoint, read and executed in the renderer main
-  world by [`main.cjs`](../main/main.cjs).
+- `core/renderer/client.js`: Entrypoint, bundled and executed in the renderer
+  main world by [`main.cjs`](../main/main.cjs).

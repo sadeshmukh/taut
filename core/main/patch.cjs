@@ -6,11 +6,11 @@ const { promises: fs, readFileSync } = require('fs')
 const Module = require('module')
 const electron = require('electron')
 
-const { PATHS, fileExists } = require('./helpers.cjs')
+const { PATHS, fileExists, esbuildInitialized } = require('./helpers.cjs')
 
 /** @type {typeof import('./deps.js')} */
 const deps = require('./deps/deps.bundle.js')
-const { installReactDevtools } = deps
+const { bundle, installReactDevtools } = deps
 
 /**
  * Hold the primary Slack BrowserWindow so we can inject scripts once ready
@@ -65,7 +65,8 @@ const proxiedBrowserWindow = new Proxy(electron.BrowserWindow, {
     instance.webContents.on('did-finish-load', async () => {
       try {
         if (await fileExists(PATHS.clientJs)) {
-          const clientJs = await fs.readFile(PATHS.clientJs, 'utf8')
+          await esbuildInitialized
+          const clientJs = await bundle(PATHS.clientJs)
           console.log('[Taut] Injecting client.js')
           await instance.webContents.executeJavaScript(clientJs)
         } else {
