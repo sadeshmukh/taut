@@ -1,5 +1,6 @@
-// webpack wizardry ooo
-// TODO: this comment and other docs
+// Taut Webpack Utilities
+// Provides utilities for finding and patching Slack's internal Webpack modules
+// Exposes React, ReactDOM, and component patching for plugins
 
 import type { Root } from 'react-dom/client'
 

@@ -1,14 +1,14 @@
 # `cli/`
 
-This is the CLI for Taut, responsible for installing and updating Taut.
+The CLI for Taut, responsible for installing and updating Taut.
 
-Environment: Node.js ESM, the `npx taut-cli` command run by the user
+Environment: Node.js ESM, run via `npx taut-cli`
 
-- `cli/cli.js`: Entrypoint, the CLI interface
-- `cli/patch.js`: The main logic for patching Slack and installing Taut
-- `cli/helpers.js`: More generic helper functions
-- `cli/windows-access.ps1`: PowerShell script to obtain write access to Slack
-- `cli/default-config.jsonc`: The default config file for Taut, copied if the
-  user doesn't yet have one
-- `cli/default-user.css`: The default user CSS file for Taut, copied if the user
-  doesn't yet have one
+- `cli.js`: Entrypoint, the CLI interface
+- `patch.js`: Main logic for patching Slack and installing Taut
+- `helpers.js`: Generic helper functions (platform detection, paths, etc.)
+- `shim.cjs`: Injected into `app.asar` to load Taut's main process code
+- `windows-access.ps1`: PowerShell script to obtain write access to Slack on
+  Windows
+- `default-config.jsonc`: Default config file, copied on first install
+- `default-user.css`: Default user CSS file, copied on first install

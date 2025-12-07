@@ -1,4 +1,6 @@
-// Dependencies that are bundled into deps/ and imported in core/main.cjs
+// Taut Main Process Dependencies
+// NPM dependencies bundled into deps/ by Bun for use in the main process
+// Provides esbuild (WASM), jsonc-parser, and React DevTools installer
 
 import * as esbuild from 'esbuild-wasm/lib/browser.js'
 import * as jsonc from 'jsonc-parser/lib/esm/main.js'

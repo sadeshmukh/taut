@@ -1,4 +1,6 @@
-// Abstract base class for all Taut plugins
+// Taut Plugin Base Class
+// Abstract class and types that all Taut plugins must extend
+// Defines the TautAPI interface available to plugins
 
 import type { TautPluginConfig } from './main/plugins.cjs'
 export type { TautPluginConfig } from './main/plugins.cjs'
@@ -19,7 +21,10 @@ export abstract class TautPlugin {
    * @param api - The TautAPI instance for plugin communication
    * @param config - The plugin's configuration from config.jsonc
    */
-  constructor(protected api: TautAPI, protected config: TautPluginConfig) {}
+  constructor(
+    protected api: TautAPI,
+    protected config: TautPluginConfig
+  ) {}
 
   /**
    * Called when the plugin should start.
@@ -49,7 +54,6 @@ export type TautPluginConstructor = new (
   api: TautAPI,
   config: object
 ) => TautPlugin
-
 
 export type TautAPI = {
   /**

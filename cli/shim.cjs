@@ -1,4 +1,5 @@
-// Entrypoint for the app.asar shim that is patched into Slack's resources directory
+// Taut App.asar Shim
+// The app.asar shim that is patched into Slack's resources directory
 
 const os = require('os')
 const path = require('path')

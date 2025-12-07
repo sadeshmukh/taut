@@ -8,9 +8,12 @@ world alongside the Slack frontend. Responsible for:
   - Accepting new plugin code injected by the main process
   - Instantiating and initializing plugins
   - Loading, reloading, and unloading plugins as the config changes
+- Adding a Taut settings tab to Slack preferences
+- Webpack module interception and React component patching
 
 Environment: Bundled by esbuild, Electron renderer process main world (Chromium,
-alongside Slack frontend), ESM
+alongside Slack frontend), TypeScript ESM with JSX
 
-- `core/renderer/client.js`: Entrypoint, bundled and executed in the renderer
-  main world by [`main.cjs`](../main/main.cjs).
+- `client.ts`: Entrypoint, contains the `PluginManager` class. Bundled and
+  executed in the renderer main world by [`main.cjs`](../main/main.cjs).
+- `webpack.tsx`: Webpack utilities for finding Slack's internal modules

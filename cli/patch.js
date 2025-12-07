@@ -1,3 +1,7 @@
+// Taut CLI Patch Module
+// Core logic for patching Slack to inject Taut
+// Handles asar extraction, code injection, and fuse flipping
+
 import fs from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import path from 'node:path'

@@ -1,3 +1,7 @@
+// Taut Renderer Helpers
+// Shared utilities for the renderer process
+// Re-exports TautBridge and provides TypedEventTarget for type-safe events
+
 import type { TautBridge } from '../preload/preload'
 
 const global = window as any

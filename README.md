@@ -19,6 +19,8 @@ Setup:
 Things to do:
 
 - Open devtools with `Ctrl+Shift+I` or `Cmd+Option+I`
+- Access the Taut settings tab in Preferences to see installed plugins and
+  config info
 - Use plugins by setting `"enabled": true` in `config.jsonc` and saving the file
 - Write your own CSS to style Slack in `user.css` (updates in the app when you
   save)

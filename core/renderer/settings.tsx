@@ -1,5 +1,9 @@
+// Taut Settings Tab
+// Adds a "Taut" tab to Slack's Preferences dialog
+// Shows installed plugins, config info, and credits
+
 import { findComponent, patchComponent } from './webpack'
-import { TautBridge } from './hepers'
+import { TautBridge } from './helpers'
 import type { PluginInfo, PluginManager } from './client'
 
 let PATHS: Awaited<ReturnType<typeof TautBridge.getConfigPaths>> | null = null

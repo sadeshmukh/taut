@@ -11,10 +11,9 @@ const MAX_CACHE_SIZE = 5000
 
 export default class IdvStatus extends TautPlugin {
   name = 'IDV Status'
-  description =
-    'Shows a red squiggle on users who are not IDV eligible'
+  description = 'Shows a red squiggle on users who are not IDV eligible'
   authors = '<@U08PUHSMW4V>'
-  
+
   idvCache: Record<string, string> = {}
   stylesElement: HTMLStyleElement | null = null
   observer: MutationObserver | null = null

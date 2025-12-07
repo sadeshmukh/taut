@@ -90,7 +90,8 @@ type OnekoConfig = TautPluginConfig & {
 
 export default class Oneko extends TautPlugin {
   name = 'Oneko'
-  description = 'A cute cat that chases your cursor around the screen, based on <https://github.com/adryd325/oneko.js|oneko.js>'
+  description =
+    'A cute cat that chases your cursor around the screen, based on <https://github.com/adryd325/oneko.js|oneko.js>'
   authors = '<https://github.com/adryd325|@adryd325>'
 
   config: OnekoConfig

@@ -1,17 +1,16 @@
 # `core/preload/`
 
 The preload script, runs in the Chromium renderer process in the isolated
-preload world. Responsible for:
+preload world. Acts as a bridge between the main process and renderer.
+Responsible for:
 
 - Communicating with the main process via IPC
 - Updating a `<style>` tag with the contents of `user.css`
-- Making `window.TautBridge` available to the renderer process, allowing the
-  renderer code to communicate with the main process
-- Fetching Slack's original preload script and `eval`ing it
+- Exposing `window.TautBridge` to the renderer process via `contextBridge`
+- Fetching and `eval`ing Slack's original preload script
 
 Environment: Electron renderer process preload script (Chromium, DOM access +
-limited Electron APIs including IPC), browser
+limited Electron APIs including IPC), browser JavaScript
 
-- `core/preload/preload.js`: Loaded by the Electron main process via the
-  `preload` option when creating the BrowserWindow, as patched by
-  [`main.cjs`](../main/main.cjs).
+- `preload.js`: Main preload script, loaded via the `preload` option when
+  creating BrowserWindow

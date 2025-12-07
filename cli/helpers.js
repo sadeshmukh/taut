@@ -1,3 +1,6 @@
+// Taut CLI Helpers
+// Shared utilities for the CLI: platform detection, Slack discovery, asar parsing
+
 import fs from 'node:fs/promises'
 import { existsSync, constants, readdirSync } from 'node:fs'
 import path from 'node:path'

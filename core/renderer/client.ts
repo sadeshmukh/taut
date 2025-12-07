@@ -9,7 +9,7 @@ import {
   commonModules,
 } from './webpack'
 import { addSettingsTab } from './settings'
-import { TautBridge, TypedEventTarget } from './hepers'
+import { TautBridge, TypedEventTarget } from './helpers'
 
 import type {
   TautPlugin,
@@ -144,7 +144,7 @@ export class PluginManager extends TypedEventTarget<{
   }
 
   getPluginInfo() {
-    return [...this.plugins.values()].map(plugin => ({
+    return [...this.plugins.values()].map((plugin) => ({
       name: plugin.instance.name,
       description: plugin.instance.description,
       authors: plugin.instance.authors,

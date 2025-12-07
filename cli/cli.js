@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// Taut CLI Entrypoint
+// Command-line interface for installing and updating Taut
+
 import path from 'node:path'
 import readline from 'node:readline/promises'
 import { install, uninstall, PATCH_VERSION } from './patch.js'
@@ -94,8 +97,8 @@ async function main() {
     // Check asar files and their versions
 
     /**
-     * @param {string} label 
-     * @param {string} asarPath 
+     * @param {string} label
+     * @param {string} asarPath
      */
     const printAppAsarInfo = async (label, asarPath) => {
       if (!existsSync(asarPath)) {
@@ -103,34 +106,34 @@ async function main() {
         return
       }
       const asarInfo = await getAsarInfo(asarPath)
-    
+
       if (asarInfo && asarInfo.name === 'taut-shim') {
         const isUpToDate = asarInfo.patchVersion === PATCH_VERSION
         const statusText = isUpToDate ? 'up to date' : 'outdated'
         console.log(
-          `${label}: Taut shim v${
-            asarInfo.patchVersion ?? '?'
-          } (${statusText})`
+          `${label}: Taut shim v${asarInfo.patchVersion ?? '?'} (${statusText})`
         )
         return
       }
       if (existsSync(path.join(resourcesDir, 'inject.js'))) {
         // This app.asar likely has Snail injected
         // https://github.com/espcaa/snail/blob/main/app/logic/install.go#L87
-        console.log(`${label}: Snail + Slack v${asarInfo?.version || '<unknown>'}`)
+        console.log(
+          `${label}: Snail + Slack v${asarInfo?.version || '<unknown>'}`
+        )
         console.log(`${label}  https://github.com/espcaa/snail`)
-        console.log(`${label}  (Taut may be compatible with Snail, but this configuration is not officially supported)`)
+        console.log(
+          `${label}  (Taut may be compatible with Snail, but this configuration is not officially supported)`
+        )
         return
       }
       if (asarInfo && asarInfo.name === 'slack-desktop') {
         console.log(`${label}: Slack v${asarInfo.version}`)
         return
       }
-      console.log(
-        `${label}: Unknown app ${asarInfo?.name || '<no name>'}`
-      )
+      console.log(`${label}: Unknown app ${asarInfo?.name || '<no name>'}`)
       if (asarInfo?.version)
-        console.log(`${label}  version ${asarInfo.version}`) 
+        console.log(`${label}  version ${asarInfo.version}`)
     }
 
     const appAsar = path.join(resourcesDir, 'app.asar')
