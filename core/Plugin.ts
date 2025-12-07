@@ -3,20 +3,55 @@
 import type { TautPluginConfig } from './main/plugins.cjs'
 export type { TautPluginConfig } from './main/plugins.cjs'
 
+/**
+ * Abstract base class that all Taut plugins must extend.
+ * Plugins are instantiated in the browser context with access to the TautAPI.
+ */
+export abstract class TautPlugin {
+  /** The display name of the plugin. */
+  abstract name: string
+  /** A short description of the plugin in mrkdwn format. */
+  abstract description: string
+  /** The authors of the plugin in mrkdwn format, using <@user_id> syntax. */
+  abstract authors: string
+
+  /**
+   * @param api - The TautAPI instance for plugin communication
+   * @param config - The plugin's configuration from config.jsonc
+   */
+  constructor(protected api: TautAPI, protected config: TautPluginConfig) {}
+
+  /**
+   * Called when the plugin should start.
+   * Subclasses must implement this method.
+   */
+  abstract start(): void
+
+  /**
+   * Called when the plugin should stop and clean up.
+   * Subclasses should override this to perform cleanup.
+   */
+  stop(): void {
+    // Default implementation does nothing
+  }
+
+  /**
+   * Log a message with the plugin's name prefix.
+   * @param args - Something to log
+   */
+  protected log(...args: any[]): void {
+    console.log(`[Taut] [${this.constructor.name}]`, ...args)
+  }
+}
+
+export default TautPlugin
+export type TautPluginConstructor = new (
+  api: TautAPI,
+  config: object
+) => TautPlugin
+
+
 export type TautAPI = {
-  /**
-   * Ask the main process to start sending plugins and configs
-   */
-  startPlugins: () => Promise<void>
-
-  /**
-   * Subscribe to config changes with a callback
-   * @param callback - Callback to invoke on config changes
-   */
-  onConfigChange: (
-    callback: (name: string, newConfig: TautPluginConfig) => void
-  ) => void
-
   /**
    * Find Webpack exports matching a filter function
    * @param filter - Filter function to match exports
@@ -55,49 +90,3 @@ export type TautAPI = {
     ReactDOMClient: typeof import('react-dom/client')
   }
 }
-
-/**
- * Abstract base class that all Taut plugins must extend.
- * Plugins are instantiated in the browser context with access to the TautAPI.
- */
-export abstract class TautPlugin {
-  protected api: TautAPI
-  protected config: TautPluginConfig
-
-  /**
-   * @param api - The TautAPI instance for plugin communication
-   * @param config - The plugin's configuration from config.jsonc
-   */
-  constructor(api: TautAPI, config: TautPluginConfig) {
-    this.api = api
-    this.config = config
-  }
-
-  /**
-   * Called when the plugin should start.
-   * Subclasses must implement this method.
-   */
-  abstract start(): void
-
-  /**
-   * Called when the plugin should stop and clean up.
-   * Subclasses should override this to perform cleanup.
-   */
-  stop(): void {
-    // Default implementation does nothing
-  }
-
-  /**
-   * Log a message with the plugin's name prefix.
-   * @param args - Something to log
-   */
-  protected log(...args: any[]): void {
-    console.log(`[Taut] [${this.constructor.name}]`, ...args)
-  }
-}
-
-export default TautPlugin
-export type TautPluginConstructor = new (
-  api: TautAPI,
-  config: object
-) => TautPlugin

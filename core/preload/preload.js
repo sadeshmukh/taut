@@ -96,6 +96,12 @@ const TautBridge = {
       }
     )
   },
+
+  /**
+   * Get paths to the config directory and files within it
+   * @returns {Promise<import('../main/helpers.cjs')['PATHS']>} - The paths object
+   */
+  getConfigPaths: () => ipcRenderer.invoke('taut:get-config-dir'),
 }
 contextBridge.exposeInMainWorld('TautBridge', TautBridge)
 

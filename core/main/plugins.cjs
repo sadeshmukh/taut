@@ -332,3 +332,7 @@ electron.ipcMain.handle('taut:start-plugins', async () => {
     return []
   }
 })
+
+electron.ipcMain.handle('taut:get-config-dir', async () => {
+  return PATHS
+})

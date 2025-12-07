@@ -2,8 +2,15 @@
 // Runs in the browser page context
 // Loads and manages plugins via TautBridge
 
-import { findExport, findByProps, findComponent, commonModules } from './webpack'
-import type { TautBridge } from '../preload/preload'
+import {
+  findExport,
+  findByProps,
+  findComponent,
+  commonModules,
+} from './webpack'
+import { addSettingsTab } from './settings'
+import { TautBridge, TypedEventTarget } from './hepers'
+
 import type {
   TautPlugin,
   TautPluginConstructor,
@@ -12,14 +19,8 @@ import type {
 } from '../Plugin'
 
 const global = window as any
-const TautBridge: TautBridge = global.TautBridge
-if (!TautBridge) {
-  throw new Error('[Taut] TautBridge is not available in the renderer context')
-}
 
 export const TautAPI: TautAPIType = {
-  startPlugins: TautBridge.startPlugins,
-  onConfigChange: TautBridge.onConfigChange,
   findExport,
   findByProps,
   findComponent,
@@ -27,11 +28,12 @@ export const TautAPI: TautAPIType = {
 }
 global.TautAPI = TautAPI
 
-
 /**
  * Plugin Manager - loads and manages Taut plugins
  */
-class PluginManager {
+export class PluginManager extends TypedEventTarget<{
+  pluginInfoChanged: PluginInfo
+}> {
   plugins = new Map<
     string,
     {
@@ -47,10 +49,10 @@ class PluginManager {
   async init() {
     console.log('[Taut] PluginManager initializing...')
 
-    TautAPI.onConfigChange((name, newConfig) => {
+    TautBridge.onConfigChange((name, newConfig) => {
       this.updatePluginConfig(name, newConfig)
     })
-    await TautAPI.startPlugins()
+    await TautBridge.startPlugins()
   }
 
   /**
@@ -90,6 +92,8 @@ class PluginManager {
     } catch (err) {
       console.error(`[Taut] Error loading plugin ${name}:`, err)
     }
+
+    this.emit('pluginInfoChanged', this.getPluginInfo())
   }
 
   /**
@@ -135,11 +139,25 @@ class PluginManager {
       }
     }
 
+    this.emit('pluginInfoChanged', this.getPluginInfo())
     console.log(`[Taut] Plugin ${name} config updated`)
   }
+
+  getPluginInfo() {
+    return [...this.plugins.values()].map(plugin => ({
+      name: plugin.instance.name,
+      description: plugin.instance.description,
+      authors: plugin.instance.authors,
+      enabled: plugin.config.enabled,
+    }))
+  }
 }
+export type PluginInfo = ReturnType<PluginManager['getPluginInfo']>
 
 // Create and initialize the plugin manager
-const pluginManager = new PluginManager()
+export const pluginManager = new PluginManager()
 global.__tautPluginManager = pluginManager
 pluginManager.init()
+
+// Add Taut settings tab
+addSettingsTab(pluginManager)

@@ -83,7 +83,7 @@ export const ReactDOMClient = findByProps([
   'hydrateRoot',
 ]) as typeof import('react-dom/client')
 
-type reactElement = Parameters<typeof React.createElement>[0]
+type reactElement<P = any> = React.ComponentType<P> | string
 function getElementName(element: reactElement): string {
   if (typeof element === 'string') return element
   if ('displayName' in element && element.displayName)
@@ -102,9 +102,9 @@ React.createElement = new Proxy(React.createElement, {
       delete props['__original']
     }
     if (replacementElement && !__original) {
-      console.log(
-        `[Taut] React.createElement: Replacing element ${getElementName(type)} with ${getElementName(replacementElement)}`
-      )
+      // console.log(
+      //   `[Taut] React.createElement: Replacing element ${getElementName(type)} with ${getElementName(replacementElement)}`
+      // )
       return Reflect.apply(target, thisArg, [
         replacementElement,
         props,
@@ -128,9 +128,21 @@ declare global {
   }
 }
 
+export function getRootFiber() {
+  const container = document.querySelector('.p-client_container')
+  if (!container) throw new Error('Could not find root container')
+  const key = Object.keys(container).find((k) =>
+    k.startsWith('__reactContainer$')
+  )
+  if (!key) throw new Error('Could not find root fiber key on container')
+  const rootFiber = (container as any)[key]
+  return rootFiber
+}
+// getFiberRoot().current === getRootFiber()
 export function getFiberRoot() {
   return [...__REACT_DEVTOOLS_GLOBAL_HOOK__.getFiberRoots(1)][0]
 }
+
 const tempRoot = ReactDOMClient.createRoot(document.createElement('div'))
 tempRoot.unmount()
 const ReactDOMRoot = tempRoot.constructor as new (fiberRoot: any) => Root
@@ -140,7 +152,7 @@ export function getRoot() {
 }
 
 export function dirtyMemoizationCache() {
-  const fiberRoot = getFiberRoot()
+  const rootFiber = getFiberRoot()
 
   const poison = (node: any) => {
     if (!node) return
@@ -150,12 +162,12 @@ export function dirtyMemoizationCache() {
     poison(node.child)
     poison(node.sibling)
   }
-  poison(fiberRoot.current)
+  poison(rootFiber)
 }
 
-export function patchComponent(
-  original: reactElement,
-  replacement: reactElement | null
+export function patchComponent<P = any>(
+  original: reactElement<P>,
+  replacement: reactElement<P> | null
 ) {
   if (typeof replacement === 'function' && !('displayName' in replacement)) {
     // Shows up as the original element name with a [Patched] tag in React DevTools

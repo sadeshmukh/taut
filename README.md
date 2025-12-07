@@ -83,10 +83,10 @@ bun taut-cli install
 
 ## Credits
 
-- Injection and proxying based on [Toshit](https://github.com/r58Playz)'s code
 - Shinigami Eyes plugin by [ShyMike](https://github.com/ImShyMike) and
   [Scooter](https://github.com/scooterthedev)
 - IdvStatus plugin by [Sahil](https://github.com/sadeshmukh)
+- Injection and proxying based on [Toshit](https://github.com/r58Playz)'s code
 - Oneko plugin based on [oneko.js](https://github.com/adryd325/oneko.js) by
   [@adryd325](https://github.com/adryd325)
 

@@ -22,6 +22,11 @@ type ShinigamiConfig = TautPluginConfig & {
 }
 
 export default class ShinigamiEyes extends TautPlugin {
+  name = 'Shinigami Eyes'
+  description =
+    'Displays Hackatime trust level indicators next to user names in Slack'
+  authors = '<@U07VC9705D4> and <@U046VA0KR8R>'
+
   config: ShinigamiConfig
 
   trustLevels: Record<string, number> = {}
