@@ -217,3 +217,49 @@ electron.app.whenReady = async () => {
   console.log('[Taut] app.whenReady() called')
   await fakeWhenReadyPromise
 }
+
+/** @type {Electron.MenuItemConstructorOptions} */
+const tautMenu = {
+  label: 'Taut',
+  submenu: [
+    {
+      label: 'About Taut',
+      click: async () => {
+        await electron.shell.openExternal('https://github.com/jeremy46231/taut')
+      },
+    },
+    { type: 'separator' },
+    {
+      role: 'toggleDevTools',
+      accelerator: 'CmdOrCtrl+Alt+I',
+    },
+    { role: 'reload' },
+    { role: 'forceReload' },
+    {
+      label: 'Quit',
+      role: 'quit',
+    },
+  ],
+}
+// Patch for Menu.setApplicationMenu to insert Taut menu
+const originalSetApplicationMenu = electron.Menu.setApplicationMenu
+electron.Menu.setApplicationMenu = function (menu) {
+  if (menu == null) {
+    return originalSetApplicationMenu.call(this, menu)
+  }
+  /** @type {(Electron.MenuItem | Electron.MenuItemConstructorOptions)[]} */
+  const menuTemplate = [...menu.items]
+  if (menuTemplate[menuTemplate.length - 1].role === 'help') {
+    // Insert before Help menu
+    menuTemplate.splice(menuTemplate.length - 1, 0, tautMenu)
+  } else {
+    // Append to end
+    menuTemplate.push(tautMenu)
+  }
+  const newMenu = electron.Menu.buildFromTemplate(menuTemplate)
+  return originalSetApplicationMenu.call(this, newMenu)
+}
+
+module.exports = {
+  BROWSER,
+}

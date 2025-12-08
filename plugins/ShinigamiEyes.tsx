@@ -28,6 +28,7 @@ const TRUST_LEVEL_COLORS_REVERSED = new Map<string, trustLevel>(
 
 type ShinigamiConfig = TautPluginConfig & {
   apiToken?: string
+  nameEmojis?: boolean
 }
 
 type AuditLog = {
@@ -83,44 +84,49 @@ export default class ShinigamiEyes extends TautPlugin {
 
     const instance = this
 
-    // Patch Message component to add trust level CSS classes
-    this.unpatchBaseMessageSender = this.api.patchComponent(
-      BaseMessageSender,
-      (OriginalBaseMessageSender) => (props) => {
-        const userId = props.userId
-        const isBotMessage = !!props.botId
+    // Only patch message sender to add trust level emoji if enabled in config
+    if (this.config.nameEmojis !== false) {
+      // Patch Message component to add trust level CSS classes
+      this.unpatchBaseMessageSender = this.api.patchComponent(
+        BaseMessageSender,
+        (OriginalBaseMessageSender) => (props) => {
+          const userId = props.userId
+          const isBotMessage = !!props.botId
 
-        const [trustLevel, setTrustLevel] = React.useState<trustLevel | null>(
-          () => {
-            if (!userId || isBotMessage) return null
-            return instance.trustLevels[userId] ?? null
-          }
-        )
-
-        React.useEffect(() => {
-          if (!userId || isBotMessage) return
-
-          // If we have a cached status, use it
-          if (instance.trustLevels[userId] !== undefined) {
-            if (trustLevel !== instance.trustLevels[userId]) {
-              setTrustLevel(instance.trustLevels[userId])
+          const [trustLevel, setTrustLevel] = React.useState<trustLevel | null>(
+            () => {
+              if (!userId || isBotMessage) return null
+              return instance.trustLevels[userId] ?? null
             }
-          }
-        }, [userId, isBotMessage])
+          )
 
-        const className =
-          trustLevel !== null ? `taut-trust-level-${trustLevel}` : ''
+          React.useEffect(() => {
+            if (!userId || isBotMessage) return
 
-        return (
-          <OriginalBaseMessageSender
-            {...props}
-            className={
-              props.className ? `${props.className} ${className}` : className
+            // If we have a cached status, use it
+            if (instance.trustLevels[userId] !== undefined) {
+              if (trustLevel !== instance.trustLevels[userId]) {
+                setTrustLevel(instance.trustLevels[userId])
+              }
             }
-          />
-        )
-      }
-    )
+          }, [userId, isBotMessage])
+
+          const className =
+            trustLevel !== null ? `taut-trust-level-${trustLevel}` : ''
+
+          return (
+            <OriginalBaseMessageSender
+              {...props}
+              className={
+                props.className ? `${props.className} ${className}` : className
+              }
+            />
+          )
+        }
+      )
+    } else {
+      this.unpatchBaseMessageSender = () => {}
+    }
 
     // Patch MemberProfileHoverCard to show trust level and audit logs
     this.unpatchMemberProfileHoverCard = this.api.patchComponent(

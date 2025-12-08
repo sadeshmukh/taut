@@ -11,7 +11,9 @@
     "ShinigamiEyes": {
       "enabled": false,
       // https://hackatime.hackclub.com/admin/admin_api_keys
-      "apiToken": ""
+      "apiToken": "",
+      // Show status emoji next to names on messages
+      "nameEmojis": true
     },
     // A little cat that chases your cursor around the screen
     "Oneko": {

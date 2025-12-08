@@ -254,7 +254,9 @@ React.createElement = new Proxy(React.createElement, {
     }
 
     if (!__original) {
-      const elementReplacers = elementReplacements.get(getOriginalComponent(type))
+      const elementReplacers = elementReplacements.get(
+        getOriginalComponent(type)
+      )
       if (elementReplacers && elementReplacers.length > 0) {
         // Can be used in place of the original type, but will not get replaced again
         const originalElement = {
