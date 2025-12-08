@@ -55,8 +55,6 @@ export default class IdvStatus extends TautPlugin {
           }
         )
 
-        const messageRef = React.useRef<HTMLDivElement>(null)
-
         React.useEffect(() => {
           if (!userId || isBotMessage || idvStatus === null) return
           if (!userId.startsWith('U') && !userId.startsWith('W')) return
@@ -97,12 +95,12 @@ export default class IdvStatus extends TautPlugin {
     this.api.setStyle(
       'idv-status',
       `
-        .taut-idv-not-eligible .c-message__sender_button {
+        .taut-idv-not-eligible {
           text-decoration: underline wavy #e01e5a !important;
           text-decoration-thickness: 1px !important;
         }
 
-        .taut-idv-over-18 .c-message__sender_button {
+        .taut-idv-over-18 {
           text-decoration: underline wavy #d97706 !important;
           text-decoration-thickness: 1px !important;
         }
