@@ -14,6 +14,10 @@ world alongside the Slack frontend. Responsible for:
 Environment: Bundled by esbuild, Electron renderer process main world (Chromium,
 alongside Slack frontend), TypeScript ESM with JSX
 
-- `client.ts`: Entrypoint, contains the `PluginManager` class. Bundled and
-  executed in the renderer main world by [`main.cjs`](../main/main.cjs).
-- `webpack.tsx`: Webpack utilities for finding Slack's internal modules
+- `main.ts`: Entrypoint, bundled and executed in the renderer main world by
+  [`main.cjs`](../main/main.cjs). Imports `client.ts`.
+- `client.ts`: Contains the `PluginManager` class and `TautAPI`.
+- `css.ts`: Utilities for injecting and removing CSS styles.
+- `react.tsx`: React utilities, including `patchComponent` for replacing Slack
+  components at runtime.
+- `webpack.ts`: Webpack utilities for finding Slack's internal modules

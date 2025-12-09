@@ -1,3 +1,5 @@
+// Shows the ID of private channels
+
 import { TautPlugin, type TautPluginConfig, type TautAPI } from '../core/Plugin'
 
 export default class PrivateChannel extends TautPlugin {

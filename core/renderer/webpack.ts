@@ -1,6 +1,6 @@
 // Taut Webpack Utilities
-// Provides utilities for finding and patching Slack's internal Webpack modules
-// Exposes React, ReactDOM, and component patching for plugins
+// Provides utilities for finding Slack's internal Webpack modules
+// Exposes React and ReactDOM for plugins
 
 const global = globalThis as any
 

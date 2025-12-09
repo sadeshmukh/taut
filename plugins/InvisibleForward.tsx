@@ -1,3 +1,5 @@
+// Makes Slack links at the start of your messages invisible
+
 import { TautPlugin, type TautPluginConfig, type TautAPI } from '../core/Plugin'
 
 export default class InvisibleForward extends TautPlugin {

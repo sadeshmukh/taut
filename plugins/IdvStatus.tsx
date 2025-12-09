@@ -1,5 +1,4 @@
 // Shows a red squiggle on users who are not IDV verified
-// Author: Sahil (https://github.com/sadeshmukh)
 
 import { TautPlugin, type TautPluginConfig, type TautAPI } from '../core/Plugin'
 

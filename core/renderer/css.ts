@@ -1,3 +1,6 @@
+// Taut CSS Utilities
+// Provides functions to inject and remove CSS styles
+
 const styleElementIdPrefix = 'taut-css-'
 
 function getStyleElement(key: string): HTMLStyleElement {

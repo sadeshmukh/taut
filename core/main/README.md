@@ -15,7 +15,8 @@ Environment: Electron main process (Node.js + Electron APIs), CommonJS
 - `main.cjs`: Entrypoint, imported by [`cli/shim.cjs`](../../cli/shim.cjs).
   Loads other modules.
 - `patch.cjs`: Electron monkey-patching: BrowserWindow proxy, Module.\_load
-  override, CORS bypass, custom app menu, and React DevTools installation
+  override, CORS bypass, application menu injection, and React DevTools
+  installation
 - `plugins.cjs`: Plugin manager: discovery, bundling with esbuild, config/CSS
   watching, and IPC handlers
 - `helpers.cjs`: Shared utilities, constants, and path definitions

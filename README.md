@@ -85,12 +85,13 @@ bun taut-cli install
 
 ## Credits
 
+- Invisible Forward plugin based on [Cyril](https://github.com/CyrilSLi)'s
+  [userscript](https://greasyfork.org/en/scripts/526439-forward-slack-messages-files-and-later-items-to-channels-and-threads-using-an-invisible-link)
 - Shinigami Eyes plugin by [ShyMike](https://github.com/ImShyMike) and
   [Scooter](https://github.com/scooterthedev)
 - IdvStatus plugin by [Sahil](https://github.com/sadeshmukh)
-- Injection and proxying based on [Toshit](https://github.com/r58Playz)'s code
-- Oneko plugin based on [oneko.js](https://github.com/adryd325/oneko.js) by
-  [@adryd325](https://github.com/adryd325)
+- Oneko plugin based on [adryd](https://github.com/adryd325)'s
+  [oneko.js](https://github.com/adryd325/oneko.js)
 
 ## License
 

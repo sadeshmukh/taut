@@ -1,3 +1,7 @@
+// Taut React Utilities
+// Provides utilities for finding and patching React components
+// Implements component patching via React.createElement proxy
+
 import type { Root } from 'react-dom/client'
 import { findExport, React, ReactDOM, ReactDOMClient } from './webpack'
 
@@ -192,6 +196,11 @@ const replacerResultCache = new WeakMap<
   componentReplacer,
   Map<ComponentType, ComponentType>
 >()
+
+/**
+ * Applies a replacer function to a component, caching the result.
+ * If the result is a function component without a display name, it assigns one.
+ */
 function applyReplacerWithCache<P = any>(
   replacer: componentReplacer<P>,
   originalComponent: ComponentType<P>
@@ -215,6 +224,10 @@ function applyReplacerWithCache<P = any>(
   return replaced
 }
 
+/**
+ * Proxy React.createElement to intercept component creation and apply patches.
+ * This allows us to replace components at runtime without modifying the original source.
+ */
 React.createElement = new Proxy(React.createElement, {
   apply(
     target: typeof React.createElement,
