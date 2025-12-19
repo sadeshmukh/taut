@@ -66,7 +66,7 @@ export async function bundle(entryPath: string): Promise<string> {
               resolve(
                 args.path,
                 {
-                  basedir: args.resolveDir,
+                  basedir: args.resolveDir || (args.importer ? path.dirname(args.importer) : undefined),
                   extensions: Object.keys(defaultLoader),
                   includeCoreModules: false,
                   preserveSymlinks: false,
@@ -84,10 +84,10 @@ export async function bundle(entryPath: string): Promise<string> {
                 }
               )
             })
-            return { path: resolvedPath }
+            return { path: resolvedPath, namespace: 'local-fs' }
           })
 
-          build.onLoad({ filter: /.*/ }, async (args) => {
+          build.onLoad({ filter: /.*/, namespace: 'local-fs' }, async (args) => {
             const contents = await fs.promises.readFile(args.path, 'utf-8')
             return {
               contents,
