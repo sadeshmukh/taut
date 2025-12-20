@@ -121,6 +121,27 @@ export function parseJSONC(text: string): any {
   })
 }
 
+/**
+ * Modify a JSONC document at the given path, preserving comments and other formatting
+ * @param text - The JSONC document text
+ * @param path - JSONPath array (e.g., ['plugins', 'PluginName', 'enabled'])
+ * @param value - The new value to set
+ * @returns The modified JSONC document text
+ */
+export function modifyJSONC(
+  text: string,
+  path: (string | number)[],
+  value: any
+): string {
+  const edits = jsonc.modify(text, path, value, {
+    formattingOptions: {
+      tabSize: 2,
+      insertSpaces: true,
+    },
+  })
+  return jsonc.applyEdits(text, edits)
+}
+
 // In the future, we could consider including the extension
 // in the installer so it doesn't install on first run
 export async function installReactDevtools() {

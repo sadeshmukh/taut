@@ -15,7 +15,7 @@ const {
 
 /** @type {typeof import('./deps.js')} */
 const deps = require('./deps/deps.bundle.js')
-const { bundle, parseJSONC } = deps
+const { bundle, parseJSONC, modifyJSONC } = deps
 
 const { BROWSER } = require('./patch.cjs')
 
@@ -336,3 +336,31 @@ electron.ipcMain.handle('taut:start-plugins', async () => {
 electron.ipcMain.handle('taut:get-config-dir', async () => {
   return PATHS
 })
+
+// IPC Handler: Set plugin enabled state (targeted edit preserving comments)
+electron.ipcMain.handle(
+  'taut:set-plugin-enabled',
+  /**
+   * @param {Electron.IpcMainInvokeEvent} _event
+   * @param {string} pluginName
+   * @param {boolean} enabled
+   * @returns {Promise<boolean>} - True if successful
+   */
+  async (_event, pluginName, enabled) => {
+    console.log(`[Taut] Setting plugin ${pluginName} enabled: ${enabled}`)
+    try {
+      const configText = await fs.readFile(PATHS.config, 'utf8')
+      const newConfigText = modifyJSONC(
+        configText,
+        ['plugins', pluginName, 'enabled'],
+        enabled
+      )
+      await fs.writeFile(PATHS.config, newConfigText, 'utf8')
+      console.log(`[Taut] Successfully updated config for plugin ${pluginName}`)
+      return true
+    } catch (err) {
+      console.error(`[Taut] Failed to update config for plugin ${pluginName}:`, err)
+      return false
+    }
+  }
+)

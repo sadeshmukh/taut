@@ -99,6 +99,15 @@ const TautBridge = {
    * @returns {Promise<import('../main/helpers.cjs')['PATHS']>} - The paths object
    */
   getConfigPaths: () => ipcRenderer.invoke('taut:get-config-dir'),
+
+  /**
+   * Set whether a plugin is enabled (persists to config file)
+   * @param {string} pluginName - The name of the plugin
+   * @param {boolean} enabled - Whether the plugin should be enabled
+   * @returns {Promise<boolean>} - True if successful
+   */
+  setPluginEnabled: (pluginName, enabled) =>
+    ipcRenderer.invoke('taut:set-plugin-enabled', pluginName, enabled),
 }
 contextBridge.exposeInMainWorld('TautBridge', TautBridge)
 

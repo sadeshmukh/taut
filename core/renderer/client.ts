@@ -144,7 +144,8 @@ export class PluginManager extends TypedEventTarget<{
   }
 
   getPluginInfo() {
-    return [...this.plugins.values()].map((plugin) => ({
+    return [...this.plugins.entries()].map(([id, plugin]) => ({
+      id,
       name: plugin.instance.name,
       description: plugin.instance.description,
       authors: plugin.instance.authors,
